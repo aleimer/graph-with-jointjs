@@ -254,6 +254,8 @@ they crowd the view — they are legible from about 70% zoom upward.
 In the demo the field is litres per day, which runs from 4 (a student's weekly box) to
 15,000 (the milk train), and every volume derives from `LITRES_PER_COW` in the generator.
 
+Open work is tracked in [TODO.md](TODO.md), with what was measured about each.
+
 ## Routing acceptance criteria
 
 `npm run check:routing` drives the running app in headless Chrome, reads the rendered
