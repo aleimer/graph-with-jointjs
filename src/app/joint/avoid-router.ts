@@ -87,6 +87,12 @@ export class AvoidRouter {
   /** Which halves of the cascade are in play. See `RouteStrategy`. */
   private readonly strategy: RouteStrategy;
   private frame: number | null = null;
+  /** Set while a drag is in progress; routing waits for it to be let go. */
+  private held = false;
+  /** A change arrived while held, so a pass is owed once it is released. */
+  private owed = false;
+  /** Links drawn straight while their node is being dragged. */
+  private previewing: dia.Link[] = [];
   private destroyed = false;
   /** True when obstacles/connectors were added but not yet routed. */
   private pending = false;
@@ -225,8 +231,52 @@ export class AvoidRouter {
     );
   }
 
+  /**
+   * Stops routing until `resume()`.
+   *
+   * A drag moves a node on every frame, and a full pass costs far more than a
+   * frame, so routing during one does not keep up: the diagram stutters and
+   * the routes trail the pointer. Nothing about a route is interesting until
+   * the node is put down, so the pass waits for that.
+   *
+   * The links on `element` are drawn straight from dock to dock meanwhile —
+   * their docks move with the node, so leaving the old vertices in place
+   * would bend them around corners that are no longer there.
+   */
+  suspend(element?: dia.Element): void {
+    this.held = true;
+    if (!element || this.previewing.length) return;
+
+    const options = { avoidRouter: true } as dia.Cell.Options;
+    for (const link of this.graph.getConnectedLinks(element, { deep: true })) {
+      link.set('vertices', [], options);
+      this.previewing.push(link);
+    }
+  }
+
+  /**
+   * Routes again, and catches up on anything that changed while held.
+   *
+   * Releases fully rather than unwinding one `suspend()` at a time. A hold
+   * that is never released stops the diagram routing for the rest of the
+   * session, and a pointer let go outside the window is all it would take;
+   * routing once more than necessary is the cheaper mistake.
+   */
+  resume(): void {
+    if (!this.held) return;
+    this.held = false;
+    this.previewing = [];
+    if (!this.owed) return;
+    this.owed = false;
+    this.schedule();
+  }
+
   private schedule(): void {
     if (this.destroyed || this.frame !== null) return;
+    if (this.held) {
+      this.owed = true;
+      return;
+    }
     this.frame = requestAnimationFrame(() => {
       this.frame = null;
       this.process();

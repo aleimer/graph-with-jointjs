@@ -240,6 +240,8 @@ export default class Graph {
       toGrid: (position) => this.toGrid(position),
       toPixels: (position) => this.toPixels(position),
       onViewPortChange: () => this.saveCurrentViewPort(),
+      onDragStart: (element) => this.avoidRouter?.suspend(element),
+      onDragEnd: () => this.avoidRouter?.resume(),
     });
     this.publishPointerEvents();
     this.applyMode();

@@ -14,6 +14,9 @@ export interface InteractionHooks {
   toPixels(position: PositionInput): Position;
   /** Called once a pan or zoom has settled, never while one is in progress. */
   onViewPortChange(): void;
+  /** A node is being dragged; routing should wait for it to be put down. */
+  onDragStart(element: dia.Element): void;
+  onDragEnd(): void;
 }
 
 /**
@@ -86,6 +89,9 @@ export function installInteraction(paper: dia.Paper, hooks: InteractionHooks): (
       onWheel(evt, x, y, delta),
   );
 
+  // --- a drag holds routing until it is over --------------------------------
+  on('element:pointerdown', (view: dia.ElementView) => hooks.onDragStart(view.model));
+
   // --- dropping a node snaps it onto the grid -------------------------------
   on('element:pointerup', (view: dia.ElementView) => {
     const element = view.model;
@@ -100,6 +106,10 @@ export function installInteraction(paper: dia.Paper, hooks: InteractionHooks): (
     if (parent?.isElement() && !isCollapsed(parent)) {
       (parent as dia.Element).fitToChildren({ padding: GROUP_PADDING });
     }
+
+    // Last, so the one pass that follows sees the snapped position and the
+    // resized parent rather than routing twice.
+    hooks.onDragEnd();
   });
 
   return () => {

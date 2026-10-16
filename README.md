@@ -291,7 +291,7 @@ including when a run fails part way.
 | Arrows must not run through nodes; obstacles are detected and routed around | every non-group node is a libavoid obstacle; routes keep `NODE_CLEARANCE` (60px) from any node they merely pass, which the checker measures as a distance rather than just an intersection |
 | Two arrows must not lie on the same routing segment; competing paths take alternative routes | each link gets its own attachment lane on the node edge (see below), plus libavoid's nudging; the checker measures the gap between the *drawn edges* of every pair of parallel segments and requires 20px |
 | Crossings are allowed but must be unambiguous | the `jumpover` connector hops one line over the other at every crossing |
-| Routing causes no noticeable delay, and stays performant with many arrows | re-route and repaint of all 66 links measured at ~26ms, well inside a frame budget for interaction; routing is debounced to one pass per animation frame |
+| Routing causes no noticeable delay, and stays performant with many arrows | routing is held while a node is dragged and runs once when it is put down: a full pass costs far more than a frame, so routing during a drag cannot keep up. Dragging a node a second's worth took 2368ms and thirteen passes before, and 243ms and none after. The link being dragged is drawn straight from dock to dock meanwhile |
 
 ### Where a link bends
 
