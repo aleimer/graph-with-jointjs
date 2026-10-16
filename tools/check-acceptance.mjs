@@ -536,7 +536,10 @@ try {
     return out;
   })()`);
 
-  const data = await fetch(`${APP_URL}graph.json`).then((r) => r.json());
+  // Resolved against the app URL rather than concatenated onto it: APP_URL
+  // may carry a query string, and `...?routing=custom` + `graph.json` asks
+  // for a file that does not exist and gets index.html back.
+  const data = await fetch(new URL('graph.json', APP_URL)).then((r) => r.json());
   for (const element of data.elements) {
     if (element.group !== 'edges') continue;
     ends[element.data.id] = { source: element.data.source, target: element.data.target };

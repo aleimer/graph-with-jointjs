@@ -302,6 +302,26 @@ Tried in order, so the simplest route that works is the one drawn:
    fallback router then works against the docks instead of with them.
 4. **libavoid** — the fallback when even that fails.
 
+`config.edges.strategy` picks which halves are in play, and `?routing=avoid`
+or `?routing=custom` overrides it for a single load so the three can be
+compared on the same data. On the dairy graph the cascade resolves every one
+of the 66 links — 31 straight, 20 with one bend, 15 dog-legs — and libavoid's
+output is read for none of them.
+
+| | combined | custom (no libavoid) | avoid (libavoid only) |
+| --- | --- | --- | --- |
+| Acceptance checks passed | 9 of 9 | 9 of 9 | 3 of 9 |
+| Crossings | 0 | 0 | 63, 3 unmarked |
+| Bends over 66 links | 49 | 49 | 70 |
+| Re-route, 61 nodes | 112ms | **31ms** | 226ms |
+| Re-route, 183 nodes | 839ms | **128ms** | — |
+
+libavoid still earns its place as a fallback for layouts the cascade cannot
+reach, and nothing here says to remove it. What the numbers say is that
+routing every link through it and then discarding the result costs most of a
+pass: `combined` and `custom` draw the same diagram, and one of them is six
+and a half times faster at three times the size.
+
 A gutter is measured between the nodes themselves, not between their buffers. With
 300px nodes 300px apart and 120px of clearance each side, padding both bands first
 leaves 60px and rejects every gap in the diagram; the middle of that same gap is 150px

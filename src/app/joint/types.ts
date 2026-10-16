@@ -83,7 +83,19 @@ export interface StylesheetStyle {
   style: Record<string, unknown>;
 }
 
+/**
+ * Which router draws the links.
+ *
+ * `combined` is what the diagram uses: a route is tried straight, then with
+ * one bend, then as a dog-leg through a chosen gutter, and only what none of
+ * those reaches is handed to libavoid. The other two exist to show what each
+ * half contributes on its own.
+ */
+export type RouteStrategy = 'combined' | 'avoid' | 'custom';
+
 export interface EdgeConfig {
+  /** Defaults to `combined`. */
+  strategy?: RouteStrategy;
   /** Collapse several redirected edges between the same pair into one. */
   bundle?: boolean;
   /** Re-point edges at the collapsed ancestor instead of hiding them. */

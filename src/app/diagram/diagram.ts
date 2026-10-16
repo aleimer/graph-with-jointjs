@@ -15,9 +15,20 @@ import { AvoidRouter } from '../joint/avoid-router';
 import { GraphControls } from '../graph-controls/graph-controls';
 import { GraphInspector } from '../graph-inspector/graph-inspector';
 import Graph from '../joint/graph';
-import type { GraphData, StylesheetStyle } from '../joint/types';
+import type { Config, GraphData, StylesheetStyle } from '../joint/types';
 
 const STORAGE_KEY = 'jointjs-playground-graph';
+/**
+ * `?routing=avoid` or `?routing=custom` overrides the configured strategy, so
+ * the three can be compared on the same data without editing it. Anything
+ * else, including no parameter at all, leaves the config alone.
+ */
+function withStrategy(config: Config): Config {
+  const asked = new URLSearchParams(location.search).get('routing');
+  if (asked !== 'avoid' && asked !== 'custom' && asked !== 'combined') return config;
+  return { ...config, edges: { ...config.edges, strategy: asked } };
+}
+
 /** Served from `public/`, so it is editable without touching any code. */
 const DATA_URL = 'graph.json';
 
@@ -64,7 +75,7 @@ export class Diagram implements AfterViewInit, OnDestroy {
     const graph = new Graph(this.canvas().nativeElement);
     graph
       .registerStylesheets(data.stylesheets ?? STYLES)
-      .setConfig(data.config ?? {})
+      .setConfig(withStrategy(data.config ?? {}))
       .addElements(data.elements)
       .render();
 

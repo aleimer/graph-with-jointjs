@@ -1,5 +1,6 @@
 import { dia } from '@joint/core';
 import { isCollapsed } from './cell-state';
+import type { RouteStrategy } from './types';
 import { AvoidLib } from 'libavoid-js';
 
 /**
@@ -28,6 +29,8 @@ export interface AvoidRouterOptions {
   clearance?: number;
   /** Gap between parallel segments that would otherwise overlap. */
   idealNudgingDistance?: number;
+  /** Which halves of the routing cascade are in play. Defaults to `combined`. */
+  strategy?: RouteStrategy;
   /**
    * The grid pitch attachment points snap to. Links leave and enter a node on
    * grid lines, and turn one lane clear of it, so the corridors line up with
@@ -81,6 +84,8 @@ export class AvoidRouter {
   private readonly buffer: number;
   private readonly lane: number;
   private readonly clearance: number;
+  /** Which halves of the cascade are in play. See `RouteStrategy`. */
+  private readonly strategy: RouteStrategy;
   private frame: number | null = null;
   private destroyed = false;
   /** True when obstacles/connectors were added but not yet routed. */
@@ -123,6 +128,7 @@ export class AvoidRouter {
     this.buffer = options.shapeBufferDistance ?? 16;
     this.lane = options.lane ?? 75;
     this.clearance = options.clearance ?? 12;
+    this.strategy = options.strategy ?? 'combined';
 
     // Embind exposes enum members as objects; the Router constructor takes a
     // raw bitfield, so the numeric `.value` is required here (the routing
@@ -1298,7 +1304,9 @@ export class AvoidRouter {
     if (this.destroyed || !this.connectors.size) return;
 
     this.refreshEndpoints();
-    this.router.processTransaction();
+    // Routing every link through libavoid and then discarding the result is
+    // most of the cost of a pass, so `custom` does not ask.
+    if (this.strategy !== 'custom') this.router.processTransaction();
     this.pending = false;
 
     this.channels = [];
@@ -1801,7 +1809,7 @@ export class AvoidRouter {
     const target = this.endpointSpec(link, 'target');
     // Prefer a single bend. libavoid's route is the fallback for the links
     // where one bend would cut through a node.
-    if (source?.docked && target?.docked) {
+    if (this.strategy !== 'avoid' && source?.docked && target?.docked) {
       const ends = [link.source().id, link.target().id];
 
       const bend = this.elbow(source, target);
@@ -1826,6 +1834,17 @@ export class AvoidRouter {
         this.centred.push({ link, vertices: detour, options });
         return;
       }
+    }
+
+    if (this.strategy === 'custom') {
+      // Nothing reached, and no fallback router to ask. An explicit detour is
+      // drawn rather than a diagonal, so what the cascade cannot do is
+      // visible as a shape instead of as a line through a node.
+      if (source && target) {
+        link.set('router', { name: 'normal' }, options);
+        link.set('vertices', AvoidRouter.detour(source, target), options);
+      }
+      return;
     }
 
     const stroke = link.attr('line/strokeWidth');

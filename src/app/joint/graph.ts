@@ -628,6 +628,7 @@ export default class Graph {
       clearance: LINK_CLEARANCE,
       // Attachments snap to the same grid the nodes are placed on.
       lane: this.gridSpacing,
+      strategy: this._config.edges?.strategy,
     });
   }
 
