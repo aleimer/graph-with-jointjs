@@ -89,6 +89,8 @@ export class AvoidRouter {
   private frame: number | null = null;
   /** Set while a drag is in progress; routing waits for it to be let go. */
   private held = false;
+  /** Routing passes run since this router was built. */
+  private passCount = 0;
   /** A change arrived while held, so a pass is owed once it is released. */
   private owed = false;
   /** Links drawn straight while their node is being dragged. */
@@ -181,6 +183,18 @@ export class AvoidRouter {
   }
 
   /** Builds every obstacle and connector, then routes. */
+  /**
+   * How many routing passes have run.
+   *
+   * Reported so that "routing does not run while a node is being dragged"
+   * can be checked as the invariant it is, rather than inferred from whether
+   * anything on screen moved — a pass that happens to change nothing would
+   * leave no trace to find.
+   */
+  get passes(): number {
+    return this.passCount;
+  }
+
   routeAll(): void {
     for (const element of this.graph.getElements()) this.addObstacle(element);
     for (const link of this.graph.getLinks()) this.addConnector(link);
@@ -1352,6 +1366,7 @@ export class AvoidRouter {
 
   private process(rerouting = false): void {
     if (this.destroyed || !this.connectors.size) return;
+    this.passCount++;
 
     // A corridor override repairs one layout. Carried into the next it forces
     // a link into a corridor chosen for geometry that has since moved, and

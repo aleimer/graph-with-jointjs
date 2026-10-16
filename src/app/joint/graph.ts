@@ -123,6 +123,14 @@ export default class Graph {
     return this._config.mode ?? 'view';
   }
 
+  /**
+   * Routing passes run so far, or 0 when the built-in router is in use.
+   * A diagnostic: see `AvoidRouter.passes`.
+   */
+  get routingPasses(): number {
+    return this.avoidRouter?.passes ?? 0;
+  }
+
   /** The selected cell, or null. Set it with `select()`. */
   get selected(): dia.Cell | null {
     return this.selectedCell;

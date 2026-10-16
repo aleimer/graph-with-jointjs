@@ -594,61 +594,58 @@ try {
 
   // 5. Dynamic calculation, and that a drag is left alone.
   //
-  // One drag answers both. While the pointer is down nothing but the dragged
-  // node's own links may be redrawn — if the rest of the diagram moves,
-  // routing is running per frame again, which no timing budget would catch
-  // because the pass after the drop would still be quick.
+  // Two things, from the same drags. Routing is held while the pointer is
+  // down and runs once on release, so the pass after the drop is what the
+  // budget is about — and that no pass runs *during* the drag is an
+  // invariant, checked by counting rather than by watching for movement. A
+  // pass that happened to change nothing would leave nothing to watch.
+  //
+  // A leaf and a group, because they are dragged by different machinery: a
+  // group carries its children, and each of them reports a move of its own.
   //
   // The clock starts at the release, since that is when the work begins.
-  const dragged = nodes.find((n) => !n.isGroup && n.width > 0);
-  if (!dragged) throw new Error('no leaf node to drag');
+  const dragAndCount = (id) =>
+    page.evaluate(`(async () => {
+      const node = document.querySelector('[model-id="${id}"]');
+      if (!node) throw new Error('not rendered: ${id}');
+      const passes = () => globalThis.graph?.routingPasses ?? -1;
 
-  const own = Object.entries(ends)
-    .filter(([, e]) => e.source === dragged.id || e.target === dragged.id)
-    .map(([id]) => id);
+      const box = node.getBoundingClientRect();
+      // A group is grabbed by its edge; its middle belongs to its children.
+      const from = { clientX: box.left + 14, clientY: box.top + 14 };
+      const to = { clientX: from.clientX + 90, clientY: from.clientY + 60 };
+      const fire = (type, at, target) =>
+        target.dispatchEvent(new MouseEvent(type, { bubbles: true, cancelable: true, ...at }));
 
-  const drag = await page.evaluate(`(async () => {
-    const node = document.querySelector('[model-id="${dragged.id}"]');
-    if (!node) throw new Error('node not rendered');
-    const box = node.getBoundingClientRect();
-    const from = { clientX: box.left + box.width / 2, clientY: box.top + box.height / 2 };
-    const to = { clientX: from.clientX + 90, clientY: from.clientY + 60 };
-    const fire = (type, at, target) =>
-      target.dispatchEvent(new MouseEvent(type, { bubbles: true, cancelable: true, ...at }));
-
-    // Which links were redrawn, by id, while the pointer was down.
-    const touched = new Set();
-    const observer = new MutationObserver((records) => {
-      for (const r of records) {
-        const link = r.target.closest?.('.joint-link');
-        if (link) touched.add(link.getAttribute('model-id'));
+      const before = passes();
+      fire('mousedown', from, node);
+      // Several frames, so a per-frame re-route would have every chance to run.
+      for (let i = 1; i <= 5; i++) {
+        fire('mousemove', { clientX: from.clientX + (i * 90) / 5, clientY: from.clientY + (i * 60) / 5 }, document);
+        await new Promise((r) => requestAnimationFrame(r));
       }
-    });
-    observer.observe(document.querySelector('.joint-paper'), {
-      subtree: true,
-      attributes: true,
-      attributeFilter: ['d'],
-    });
+      const during = passes() - before;
 
-    fire('mousedown', from, node);
-    // Several frames, so a per-frame re-route would have every chance to run.
-    for (let i = 1; i <= 5; i++) {
-      fire('mousemove', { clientX: from.clientX + (i * 90) / 5, clientY: from.clientY + (i * 60) / 5 }, document);
-      await new Promise((r) => requestAnimationFrame(r));
-    }
-    observer.disconnect();
-    const duringDrag = [...touched];
+      const start = performance.now();
+      fire('mouseup', to, document);
+      await new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve)));
+      return { during, after: passes() - before, timing: Math.round(performance.now() - start) };
+    })()`);
 
-    const start = performance.now();
-    fire('mouseup', to, document);
-    await new Promise((resolve) =>
-      requestAnimationFrame(() => requestAnimationFrame(resolve)),
-    );
-    return { duringDrag, timing: Math.round(performance.now() - start) };
-  })()`);
+  const leaf = nodes.find((n) => !n.isGroup && n.width > 0);
+  const group = nodes.find((n) => n.isGroup && n.width > 0);
+  if (!leaf) throw new Error('no leaf node to drag');
 
-  const timing = drag.timing;
-  const strayed = drag.duringDrag.filter((id) => id && !own.includes(id));
+  const drags = [];
+  for (const node of [leaf, group].filter(Boolean)) {
+    drags.push({ id: node.id, ...(await dragAndCount(node.id)) });
+  }
+  if (drags.some((d) => d.during < 0)) {
+    throw new Error('globalThis.graph is missing — is the app in development mode?');
+  }
+
+  const timing = drags[0].timing;
+  const busy = drags.filter((d) => d.during > 0);
 
   const results = [
     checkOrthogonal(links, tolerance),
@@ -675,8 +672,10 @@ try {
     },
     {
       name: 'Drag left alone',
-      detail: `${strayed.length} links other than the dragged node's redrawn while the pointer was down`,
-      bad: strayed.map((link) => ({ link })),
+      detail:
+        `no routing while the pointer is down, over a leaf and a group` +
+        ` (${drags.map((d) => `${d.id}: ${d.during} during, ${d.after} after`).join('; ')})`,
+      bad: busy.map((d) => ({ dragged: d.id, passesDuringDrag: d.during })),
     },
   ];
 

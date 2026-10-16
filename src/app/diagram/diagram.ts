@@ -1,6 +1,7 @@
 import {
   AfterViewInit,
   Component,
+  isDevMode,
   DestroyRef,
   ElementRef,
   inject,
@@ -78,6 +79,12 @@ export class Diagram implements AfterViewInit, OnDestroy {
       .setConfig(withStrategy(data.config ?? {}))
       .addElements(data.elements)
       .render();
+
+    // A handle for the console and for tools/check-acceptance.mjs, which has
+    // no other way in. Development only: nothing should depend on it.
+    if (isDevMode()) {
+      (globalThis as unknown as { graph?: Graph }).graph = graph;
+    }
 
     this.bindHoverTools(graph);
     // Set last: the toolbar is created the moment this is non-null, and it
