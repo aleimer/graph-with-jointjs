@@ -52,7 +52,8 @@
                   "maximumError": "8kB"
                 }
               ],
-              "outputHashing": "all"
+              "outputHashing": "all",
+              "baseHref": "/graph-with-jointjs/"
             },
             "development": {
               "optimization": false,
