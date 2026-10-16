@@ -11,16 +11,11 @@ import {
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { dia, elementTools, linkTools } from '@joint/core';
 import { AvoidRouter } from '../joint/avoid-router';
-import { dataOf, isCollapsed } from '../joint/cell-state';
 
 import { GraphControls } from '../graph-controls/graph-controls';
+import { GraphInspector } from '../graph-inspector/graph-inspector';
 import Graph from '../joint/graph';
-import { GroupNode } from '../joint/nodes';
-import type {
-  GraphData,
-  GridPosition,
-  StylesheetStyle,
-} from '../joint/types';
+import type { GraphData, StylesheetStyle } from '../joint/types';
 
 const STORAGE_KEY = 'jointjs-playground-graph';
 /** Served from `public/`, so it is editable without touching any code. */
@@ -34,7 +29,7 @@ const STYLES: StylesheetStyle[] = [
 
 @Component({
   selector: 'app-diagram',
-  imports: [GraphControls],
+  imports: [GraphControls, GraphInspector],
   templateUrl: './diagram.html',
   styleUrl: './diagram.scss',
   host: { '(document:keydown)': 'onKeydown($event)' },
@@ -54,17 +49,6 @@ export class Diagram implements AfterViewInit, OnDestroy {
    */
   protected readonly graph = signal<Graph | null>(null);
 
-  // What the inspector shows. JointJS lives outside Angular's world, so this
-  // is mirrored into signals from the bus. The app is zoneless (Angular 22
-  // default): signal writes are what schedule change detection, so a plain
-  // field assignment would not re-render.
-  readonly selectedLabel = signal<string | null>(null);
-  readonly selectedJson = signal('');
-  readonly selectedIsGroup = signal(false);
-  readonly selectedCol = signal(0);
-  readonly selectedRow = signal(0);
-
-  private selected: dia.Element | null = null;
 
   async ngAfterViewInit(): Promise<void> {
     // The WASM router has to be ready before any config asks for it. If it
@@ -84,7 +68,7 @@ export class Diagram implements AfterViewInit, OnDestroy {
       .addElements(data.elements)
       .render();
 
-    this.bindGraphEvents(graph);
+    this.bindHoverTools(graph);
     // Set last: the toolbar is created the moment this is non-null, and it
     // reads the graph's opening state across as it binds.
     this.graph.set(graph);
@@ -100,23 +84,13 @@ export class Diagram implements AfterViewInit, OnDestroy {
    * `takeUntilDestroyed` ends these with the component; the graph completing
    * on `destroy()` would end them too, and either is enough.
    */
-  private bindGraphEvents(graph: Graph): void {
+  /**
+   * The hover tools, which belong to the canvas rather than to either panel:
+   * they are drawn on the paper, over the cell the pointer is on.
+   */
+  private bindHoverTools(graph: Graph): void {
     const bus = graph.eventbus;
     const ref = this.destroyRef;
-
-    bus
-      .on('selection:changed')
-      .pipe(takeUntilDestroyed(ref))
-      .subscribe(({ cell }) => {
-        this.selected = cell?.isElement() ? (cell as dia.Element) : null;
-        this.showSelected();
-      });
-
-    // Coalesced: one notice per tick however many cells moved.
-    bus
-      .on('graph:changed')
-      .pipe(takeUntilDestroyed(ref))
-      .subscribe(() => this.showSelected());
 
     bus
       .on('cell:mouseover')
@@ -164,44 +138,9 @@ export class Diagram implements AfterViewInit, OnDestroy {
     );
   }
 
-  /** Mirrors the selected cell into what the inspector renders. */
-  private showSelected(): void {
-    const element = this.selected;
-    const graph = this.graph();
-
-    this.selectedLabel.set(element ? String(element.attr('label/text') ?? '') : null);
-    this.selectedIsGroup.set(element instanceof GroupNode);
-    this.selectedJson.set(element ? JSON.stringify(dataOf(element), null, 2) : '');
-
-    const cell = element && graph ? graph.toGrid(element.position()) : { col: 0, row: 0 };
-    this.selectedCol.set(cell.col);
-    this.selectedRow.set(cell.row);
-  }
-
   // --- selection -----------------------------------------------------------
 
-  /** Moves the selected node to a grid cell typed into the inspector. */
-  moveSelected(axis: 'col' | 'row', value: string): void {
-    const element = this.selected;
-    if (!element) return;
-
-    const parsed = Number.parseInt(value, 10);
-    if (Number.isNaN(parsed)) return;
-
-    const position: GridPosition = {
-      col: axis === 'col' ? parsed : this.selectedCol(),
-      row: axis === 'row' ? parsed : this.selectedRow(),
-    };
-    this.graph()!.setNodePosition(String(element.id), position);
-    this.showSelected();
-  }
-
   // --- the inspector -------------------------------------------------------
-
-  renameSelected(value: string): void {
-    this.selectedLabel.set(value);
-    this.selected?.attr('label/text', value);
-  }
 
   load(): void {
     const raw = localStorage.getItem(STORAGE_KEY);

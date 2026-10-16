@@ -5,44 +5,7 @@
 <main class="workspace">
   <div #canvas class="canvas"></div>
 
-  @if (selectedLabel() !== null) {
-    <aside class="inspector">
-      <label class="field">
-        <span>Label</span>
-        <input
-          type="text"
-          [value]="selectedLabel()"
-          (input)="renameSelected($any($event.target).value)"
-        />
-      </label>
-
-      <div class="grid-field">
-        <label class="field">
-          <span>Column</span>
-          <input
-            type="number"
-            [value]="selectedCol()"
-            (input)="moveSelected('col', $any($event.target).value)"
-          />
-        </label>
-        <label class="field">
-          <span>Row</span>
-          <input
-            type="number"
-            [value]="selectedRow()"
-            (input)="moveSelected('row', $any($event.target).value)"
-          />
-        </label>
-      </div>
-
-      <p class="hint">
-        @if (selectedIsGroup()) {
-          Group node — collapsing stashes its children and re-points crossing edges at the group.
-        } @else {
-          Element <code>data</code>, as passed to <code>addElements()</code>:
-        }
-      </p>
-      <pre>{{ selectedJson() }}</pre>
-    </aside>
+  @if (graph(); as g) {
+    <graph-inspector [graph]="g" />
   }
 </main>
