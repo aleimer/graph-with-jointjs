@@ -523,6 +523,40 @@ const page = await connect();
 try {
   await page.evaluate('new Promise((r) => setTimeout(r, 9000))');
 
+  // `--after-drag` checks the criteria against a graph that has been
+  // interacted with, not just one that has finished loading. A route is only
+  // as correct as it stays once a node has been moved.
+  if (process.argv.includes('--after-drag')) {
+    const moved = await page.evaluate(`(() => {
+      const node = [...document.querySelectorAll('.joint-element')].find(
+        (el) => !/-farm$|-line$|channels/.test(el.getAttribute('model-id') ?? ''),
+      );
+      const box = node.getBoundingClientRect();
+      const from = { clientX: box.left + box.width / 2, clientY: box.top + box.height / 2 };
+      const fire = (type, at, target) =>
+        target.dispatchEvent(new MouseEvent(type, { bubbles: true, cancelable: true, ...at }));
+
+      fire('mousedown', from, node);
+      // Delivered back to back, the way a pointer does, so the router is
+      // asked to keep up rather than given a pause between each step.
+      const pause = ${Number(process.env['DRAG_STEP_MS'] ?? 0)};
+      const stepX = ${Number(process.env['DRAG_X'] ?? 8)};
+      const stepY = ${Number(process.env['DRAG_Y'] ?? 6)};
+      const wait = (ms) => new Promise((r) => setTimeout(r, ms));
+      return (async () => {
+        for (let i = 1; i <= 30; i++) {
+          fire('mousemove', { clientX: from.clientX + i * stepX, clientY: from.clientY + i * stepY }, document);
+          if (pause) await wait(pause);
+        }
+        fire('mouseup', { clientX: from.clientX + 30 * stepX, clientY: from.clientY + 30 * stepY }, document);
+        return node.getAttribute('model-id');
+      })();
+    })()`);
+    // Long enough for every queued re-route to have run out.
+    await page.evaluate('new Promise((r) => setTimeout(r, 3000))');
+    console.log(`  (dragged ${moved} first)`);
+  }
+
   const geometry = await page.evaluate(`(${collectGeometry.toString()})()`);
   const { nodes, links, tolerance } = geometry;
 

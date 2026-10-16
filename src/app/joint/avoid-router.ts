@@ -1303,6 +1303,15 @@ export class AvoidRouter {
   private process(rerouting = false): void {
     if (this.destroyed || !this.connectors.size) return;
 
+    // A corridor override repairs one layout. Carried into the next it forces
+    // a link into a corridor chosen for geometry that has since moved, and
+    // because the repair pass can only add overrides, never drop them, they
+    // pile up: every drag left the diagram a little worse than it found it,
+    // including in corners nothing had been dragged near. They belong to the
+    // pass that made them, so a fresh pass starts without them — but a repair
+    // of the pass in progress keeps what that pass just decided.
+    if (!rerouting) this.corridorOverrides.clear();
+
     this.refreshEndpoints();
     // Routing every link through libavoid and then discarding the result is
     // most of the cost of a pass, so `custom` does not ask.
