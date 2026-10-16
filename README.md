@@ -260,6 +260,20 @@ In the demo the field is litres per day, which runs from 4 (a student's weekly b
 geometry out of the SVG and verifies each criterion against what is actually drawn —
 not against what the router claims. Start the dev server first.
 
+`npm run bench:routing` runs that harness repeatedly: once per routing strategy, at
+each size asked for. It tiles the demo data to make a bigger graph, so the question
+"does this still hold at three times the size, and what does each half of the router
+cost" is one command rather than an afternoon.
+
+```
+npm run bench:routing                            # 1x, 2x, 3x by all three strategies
+npm run bench:routing -- --scales=1,3
+npm run bench:routing -- --strategies=combined,custom
+```
+
+It writes over `public/graph.json` while it runs and puts the original back afterwards,
+including when a run fails part way.
+
 ```
   66 links, 61 nodes
 

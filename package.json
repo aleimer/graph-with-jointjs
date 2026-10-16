@@ -8,7 +8,8 @@
     "watch": "ng build --watch --configuration development",
     "test": "ng test",
     "demo:data": "node tools/build-demo-data.mjs",
-    "check:routing": "node tools/check-acceptance.mjs"
+    "check:routing": "node tools/check-acceptance.mjs",
+    "bench:routing": "node tools/bench-routing.mjs"
   },
   "private": true,
   "packageManager": "npm@11.12.1",

@@ -600,6 +600,22 @@ try {
     },
   ];
 
+  // `--json` is for tools/bench-routing.mjs, which reads these rather than
+  // scraping the table below.
+  if (process.argv.includes('--json')) {
+    console.log(
+      JSON.stringify({
+        nodes: nodes.length,
+        links: links.length,
+        timing,
+        budget: REROUTE_BUDGET_MS,
+        results: results.map((r) => ({ name: r.name, pass: r.bad.length === 0, detail: r.detail })),
+      }),
+    );
+    page.close();
+    process.exit(results.some((r) => r.bad.length) ? 1 : 0);
+  }
+
   console.log(`\n  ${links.length} links, ${nodes.length} nodes\n`);
   let failed = 0;
   for (const result of results) {
