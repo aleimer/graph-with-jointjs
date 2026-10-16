@@ -284,7 +284,8 @@ including when a run fails part way.
   PASS  Overlap avoidance      no two links share a collinear stretch
   PASS  Grid-aligned ends      attachments snap to the 75px grid
   PASS  Crossings marked       90 crossings drawn as jumps, 0 left unmarked
-  PASS  Dynamic calculation    re-route + paint in 23ms (budget 120ms)
+  PASS  Dynamic calculation    re-route + paint in 133ms after the drop (budget 300ms)
+  PASS  Drag left alone        0 links other than the dragged node's redrawn while the pointer was down
 ```
 
 | Criterion | How it is met |

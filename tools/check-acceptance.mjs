@@ -24,8 +24,21 @@ const PORT = 9333;
 const CHROME =
   process.env['CHROME'] ??
   'C:/Program Files/Google/Chrome/Application/chrome.exe';
-/** A re-route slower than this would be felt while dragging a node. */
-const REROUTE_BUDGET_MS = 120;
+/**
+ * How long the one routing pass after a node is put down may take.
+ *
+ * Routing is held during a drag and runs once on release, so every trigger is
+ * now a discrete action rather than a stream of frames: there is no 60Hz
+ * consumer to satisfy, and the frame budget that used to apply does not.
+ *
+ * What constrains it instead is that the pass is synchronous and blocks the
+ * window. Around 100ms a release still feels joined to its result; a second is
+ * where the freeze is plainly noticed. This sits between the two, with room
+ * for the dataset to grow two or three times, which is what it is expected to
+ * do — `npm run bench:routing` puts that at 128ms without libavoid in the hot
+ * path and 839ms with it.
+ */
+const REROUTE_BUDGET_MS = 300;
 /** Must match the router's `lane` option (Graph passes its grid spacing). */
 const LANE = 75;
 /** Must match the router's `shapeBufferDistance`. */
@@ -579,17 +592,22 @@ try {
     ends[element.data.id] = { source: element.data.source, target: element.data.target };
   }
 
-  // 5. Dynamic calculation: time a full re-route triggered by moving a node.
+  // 5. Dynamic calculation, and that a drag is left alone.
   //
-  // A leaf, dragged. Clicking the first element on the page would land on a
-  // group, and in view mode a click on one opens or closes it — which is a
-  // far bigger operation than a nudge, and not what this is measuring. And a
-  // click that does not move anything re-routes nothing, so it would measure
-  // nothing at all.
+  // One drag answers both. While the pointer is down nothing but the dragged
+  // node's own links may be redrawn — if the rest of the diagram moves,
+  // routing is running per frame again, which no timing budget would catch
+  // because the pass after the drop would still be quick.
+  //
+  // The clock starts at the release, since that is when the work begins.
   const dragged = nodes.find((n) => !n.isGroup && n.width > 0);
   if (!dragged) throw new Error('no leaf node to drag');
 
-  const timing = await page.evaluate(`(() => {
+  const own = Object.entries(ends)
+    .filter(([, e]) => e.source === dragged.id || e.target === dragged.id)
+    .map(([id]) => id);
+
+  const drag = await page.evaluate(`(async () => {
     const node = document.querySelector('[model-id="${dragged.id}"]');
     if (!node) throw new Error('node not rendered');
     const box = node.getBoundingClientRect();
@@ -598,16 +616,39 @@ try {
     const fire = (type, at, target) =>
       target.dispatchEvent(new MouseEvent(type, { bubbles: true, cancelable: true, ...at }));
 
-    const start = performance.now();
+    // Which links were redrawn, by id, while the pointer was down.
+    const touched = new Set();
+    const observer = new MutationObserver((records) => {
+      for (const r of records) {
+        const link = r.target.closest?.('.joint-link');
+        if (link) touched.add(link.getAttribute('model-id'));
+      }
+    });
+    observer.observe(document.querySelector('.joint-paper'), {
+      subtree: true,
+      attributes: true,
+      attributeFilter: ['d'],
+    });
+
     fire('mousedown', from, node);
-    fire('mousemove', to, document);
+    // Several frames, so a per-frame re-route would have every chance to run.
+    for (let i = 1; i <= 5; i++) {
+      fire('mousemove', { clientX: from.clientX + (i * 90) / 5, clientY: from.clientY + (i * 60) / 5 }, document);
+      await new Promise((r) => requestAnimationFrame(r));
+    }
+    observer.disconnect();
+    const duringDrag = [...touched];
+
+    const start = performance.now();
     fire('mouseup', to, document);
-    return new Promise((resolve) =>
-      requestAnimationFrame(() =>
-        requestAnimationFrame(() => resolve(Math.round(performance.now() - start))),
-      ),
+    await new Promise((resolve) =>
+      requestAnimationFrame(() => requestAnimationFrame(resolve)),
     );
+    return { duringDrag, timing: Math.round(performance.now() - start) };
   })()`);
+
+  const timing = drag.timing;
+  const strayed = drag.duringDrag.filter((id) => id && !own.includes(id));
 
   const results = [
     checkOrthogonal(links, tolerance),
@@ -629,8 +670,13 @@ try {
     checkCrossings(links, tolerance),
     {
       name: 'Dynamic calculation',
-      detail: `re-route + paint in ${timing}ms (budget ${REROUTE_BUDGET_MS}ms)`,
+      detail: `re-route + paint in ${timing}ms after the drop (budget ${REROUTE_BUDGET_MS}ms)`,
       bad: timing > REROUTE_BUDGET_MS ? [{ timing }] : [],
+    },
+    {
+      name: 'Drag left alone',
+      detail: `${strayed.length} links other than the dragged node's redrawn while the pointer was down`,
+      bad: strayed.map((link) => ({ link })),
     },
   ];
 

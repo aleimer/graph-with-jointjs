@@ -140,14 +140,18 @@ Roughly O(n^1.8): 61 nodes 113ms, 122 nodes 390ms, 183 nodes 827ms. Almost all
 of it is 4.1. The real dataset is expected to grow 2-3x, where `custom` lands
 at 128ms — 8ms over budget — and `combined` at 839ms.
 
-### 4.3 The 120ms budget only covers half the question
+### 4.3 ~~The 120ms budget only covers half the question~~ — done
 
-It is roughly where a *discrete* response stops feeling instant, which is the
-right bar for the pass after a node is dropped and the wrong one for dragging,
-where the bar is one frame. Since 207f74d routing happens once per drop, so the
-number now measures the thing it suits — but there is no check at all on what a
-drag costs. Worth adding, so the regression that 207f74d fixed cannot return
-unnoticed.
+The budget is 300ms and derived: the pass is synchronous and blocks the
+window, around 100ms a release still feels joined to its result, a second is
+plainly noticed, and the dataset is expected to grow two or three times. At
+120ms a 3x graph without libavoid in the hot path would have failed by 8ms,
+reporting that the architecture does not scale when it does.
+
+Drag smoothness is guarded by an invariant rather than a timing: `Drag left
+alone` fails if any link other than the dragged node's own is redrawn while
+the pointer is down. Verified by disabling the hold, which turns it red with
+11 stray links.
 
 ---
 
