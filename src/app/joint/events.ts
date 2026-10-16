@@ -34,6 +34,15 @@ export interface GraphEvents {
   /** The paper was panned or zoomed, however it was asked for. */
   'viewport:moved': ViewPortEvent;
 
+  /**
+   * What is selected, or null for nothing.
+   *
+   * Only the cell travels. Everything a consumer wants to show about it — a
+   * label, whether it is a group, the data bag — is on the cell already, and
+   * a payload that repeated them would be one more thing to keep in step.
+   */
+  'selection:changed': { cell: dia.Cell | null };
+
   // --- asked of the graph ----------------------------------------------------
   'viewport:zoom': { by?: number; to?: number };
   'viewport:fit': void;
@@ -44,6 +53,9 @@ export interface GraphEvents {
   'node:move': { id: string; position: GridPosition };
   'cells:remove': { selector: string };
   'layout:arrange': void;
+  'selection:set': { id: string | null };
+  'selection:delete': void;
+  'selection:collapse': void;
 }
 
 /** A pointer event on a cell, or on blank paper when `cell` is null. */

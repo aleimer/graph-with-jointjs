@@ -1,0 +1,35 @@
+<header class="toolbar">
+  <span class="brand">JointJS playground</span>
+
+  <div class="group">
+    <button type="button" (click)="addNode()">Add node</button>
+    <button type="button" (click)="deleteSelected()" [disabled]="!hasSelection()">Delete</button>
+    <button type="button" (click)="toggleCollapse()" [disabled]="!selectionIsGroup()">
+      {{ collapseLabel() }}
+    </button>
+    <button type="button" (click)="arrange()">Arrange</button>
+  </div>
+
+  <div class="group">
+    <button type="button" (click)="zoomBy(-0.2)">&minus;</button>
+    <button type="button" class="zoom" (click)="resetZoom()">{{ zoomPercent() }}%</button>
+    <button type="button" (click)="zoomBy(0.2)">+</button>
+    <button type="button" (click)="fit()">Fit</button>
+  </div>
+
+  <div class="group">
+    <button type="button" [class.is-off]="!gridVisible()" (click)="toggleGrid()">Grid</button>
+    <button type="button" [class.is-off]="edgesHidden()" (click)="toggleEdges()">Edges</button>
+    <button type="button" [class.is-off]="!valuesVisible()" (click)="toggleValues()">Values</button>
+  </div>
+
+  <div class="group">
+    <button type="button" (click)="save()">Save</button>
+    <button type="button" (click)="loadSaved.emit()">Load</button>
+    <button type="button" (click)="reloadSource.emit()">Reload JSON</button>
+    <button type="button" (click)="exportJson()">Export</button>
+    <button type="button" (click)="clear()">Clear</button>
+  </div>
+
+  <span class="stats">{{ nodeCount() }} nodes &middot; {{ linkCount() }} links</span>
+</header>

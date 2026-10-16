@@ -1,4 +1,4 @@
-import { dia } from '@joint/core';
+import { dia, highlighters } from '@joint/core';
 import { AvoidRouter } from './avoid-router';
 import { classesOf, isCollapsed, read, write } from './cell-state';
 import {
@@ -37,6 +37,9 @@ import type {
 } from './types';
 
 const DEFAULT_GRID: GridSize = { cellWidth: 220, cellHeight: 130 };
+
+/** Highlighter id for the selection ring. */
+const SELECTION_ID = 'selection';
 
 function isGridPosition(position: PositionInput): position is GridPosition {
   return 'col' in position;
@@ -103,7 +106,21 @@ export default class Graph {
     return { nodes: this.model.getElements(), edges: this.model.getLinks() };
   }
 
-  private config: Config = {};
+  /**
+   * The configuration as it stands, for a caller that needs to toggle one
+   * part of it without keeping its own copy of the rest.
+   */
+  get config(): Readonly<Config> {
+    return this._config;
+  }
+
+  /** The selected cell, or null. Set it with `select()`. */
+  get selected(): dia.Cell | null {
+    return this.selectedCell;
+  }
+
+  private _config: Config = {};
+  private selectedCell: dia.Cell | null = null;
   private _styles: StylesheetStyle[] = [];
   /** True once `render()` has drawn; until then there is nothing to restyle. */
   private isRendered = false;
@@ -148,7 +165,7 @@ export default class Graph {
     this.model = new dia.Graph({}, { cellNamespace });
     // Read through rather than captured: the config can change between one
     // collapse and the next.
-    this.groups = new Groups(this.model, () => this.config.edges?.bundle === true);
+    this.groups = new Groups(this.model, () => this._config.edges?.bundle === true);
 
     // Cells can arrive without the facade being told: the Connect tool draws
     // a link straight into the model, and `addParents()` can mint a group.
@@ -176,6 +193,10 @@ export default class Graph {
     });
     this.publishPointerEvents();
     this.answerCommands();
+    // Tapping selects, as Cytoscape does; tapping blank paper clears.
+    this.subscriptions.push(
+      this.eventbus.on('cell:tap').subscribe(({ cell }) => this.select(cell)),
+    );
     this.renderGrid(true);
   }
 
@@ -256,6 +277,7 @@ export default class Graph {
   }
 
   destroy(): this {
+    this.selectedCell = null;
     for (const subscription of this.subscriptions) subscription.unsubscribe();
     this.subscriptions.length = 0;
     // Ending the bus ends every outside subscription too, so one that
@@ -351,6 +373,25 @@ export default class Graph {
     return this;
   }
 
+  /**
+   * Selects a cell, or clears the selection with null.
+   *
+   * The facade owns this because more than one consumer needs it — a toolbar
+   * enabling its buttons, an inspector showing what is chosen — and a
+   * selection kept in one of them is invisible to the others. Cytoscape owns
+   * selection too, so the shape is the one being mirrored.
+   */
+  select(cell: dia.Cell | null): this {
+    if (cell === this.selectedCell) return this;
+
+    this.highlight(this.selectedCell, false);
+    this.selectedCell = cell;
+    this.highlight(cell, true);
+
+    this.eventbus.emit('selection:changed', { cell });
+    return this;
+  }
+
   saveCurrentViewPort(): this {
     if (!this.paper) return this;
     const { tx, ty } = this.paper.translate();
@@ -368,7 +409,7 @@ export default class Graph {
   }
 
   setConfig(config: Config): this {
-    this.config = { ...this.config, ...config };
+    this._config = { ...this._config, ...config };
     if (config.grid) {
       this.grid = config.grid;
       this.renderGrid(true);
@@ -449,7 +490,7 @@ export default class Graph {
 
   /** Applies `config.positions`; anything unplaced gets the next free cell. */
   setPosition(): this {
-    const positions = this.config.positions ?? {};
+    const positions = this._config.positions ?? {};
     let slot = 0;
 
     for (const element of this.model.getElements()) {
@@ -541,7 +582,7 @@ export default class Graph {
     }
     // Routes have to clear each other by more than the widest line, or thick
     // links nudged apart by a few pixels still overlap on screen.
-    const widest = this.config.edges?.weight?.max ?? 10;
+    const widest = this._config.edges?.weight?.max ?? 10;
     this.avoidRouter = new AvoidRouter(this.model, {
       shapeBufferDistance: NODE_CLEARANCE,
       idealNudgingDistance: Math.round(widest + LINK_CLEARANCE),
@@ -618,12 +659,49 @@ export default class Graph {
       bus.on('config:set').subscribe((config) => this.setConfig(config)),
       bus.on('node:move').subscribe(({ id, position }) => this.setNodePosition(id, position)),
       bus.on('cells:remove').subscribe(({ selector }) => this.remove(selector)),
+      bus.on('selection:set').subscribe(({ id }) => {
+        this.select(id === null ? null : (this.model.getCell(id) ?? null));
+      }),
+      bus.on('selection:delete').subscribe(() => {
+        const cell = this.selectedCell;
+        if (!cell) return;
+        this.select(null);
+        this.model.removeCells([cell]);
+      }),
+      bus.on('selection:collapse').subscribe(() => {
+        const cell = this.selectedCell;
+        if (!cell?.isElement()) return;
+        const element = cell as dia.Element;
+        if (isCollapsed(element)) this.expand([element]);
+        else this.collapse([element]);
+        // Collapsing changes what the cell is, not which cell it is, so the
+        // selection stands — but anyone showing it has to hear about it.
+        this.eventbus.emit('selection:changed', { cell });
+      }),
       bus.on('layout:arrange').subscribe(() => {
         // Dropping the saved positions makes setPosition() lay everything out.
         this.setConfig({ positions: {} }).setPosition();
         this.fit();
       }),
     );
+  }
+
+  /** Draws or removes the selection ring. */
+  private highlight(cell: dia.Cell | null, on: boolean): void {
+    const paper = this.paper;
+    if (!cell || !paper) return;
+
+    const view = cell.findView(paper);
+    if (!view) return;
+
+    if (!on) {
+      highlighters.mask.remove(view, SELECTION_ID);
+      return;
+    }
+    highlighters.mask.add(view, { selector: 'body' }, SELECTION_ID, {
+      padding: 4,
+      attrs: { stroke: '#6366f1', strokeWidth: 2.5 },
+    });
   }
 
   /** Announces that the model changed, once for this tick. */
@@ -633,6 +711,8 @@ export default class Graph {
 
     queueMicrotask(() => {
       this.changeQueued = false;
+      // The selection may have been collapsed or removed out from under us.
+      if (this.selectedCell && !this.model.getCell(this.selectedCell.id)) this.select(null);
       const { nodes, edges } = this.data;
       this.eventbus.emit('graph:changed', { nodes: nodes.length, links: edges.length });
     });
@@ -687,10 +767,10 @@ export default class Graph {
     const cells = this.model.getCells();
     applyStylesheets(cells, this._styles);
 
-    const weight = this.config.edges?.weight;
+    const weight = this._config.edges?.weight;
     if (weight) applyWeights(this.model.getLinks(), weight);
 
-    applyFilter(cells, this.config.filter);
+    applyFilter(cells, this._config.filter);
   }
 
   private addNodes(elements: NodeDefinition[]): void {
@@ -747,7 +827,7 @@ export default class Graph {
   }
 
   private initialExpandCollapse(): void {
-    const ids = this.config.collapsed ?? [];
+    const ids = this._config.collapsed ?? [];
     if (!ids.length) return;
 
     const nodes = ids

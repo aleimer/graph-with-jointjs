@@ -5,26 +5,23 @@ import {
   ElementRef,
   inject,
   OnDestroy,
-  computed,
   signal,
   viewChild,
 } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
-import { dia, elementTools, highlighters, linkTools } from '@joint/core';
+import { dia, elementTools, linkTools } from '@joint/core';
 import { AvoidRouter } from '../joint/avoid-router';
 import { dataOf, isCollapsed } from '../joint/cell-state';
 
+import { GraphControls } from '../graph-controls/graph-controls';
 import Graph from '../joint/graph';
 import { GroupNode } from '../joint/nodes';
 import type {
-  EdgeConfig,
-  EdgeWeightLabel,
   GraphData,
   GridPosition,
   StylesheetStyle,
 } from '../joint/types';
 
-const SELECTION_ID = 'selection';
 const STORAGE_KEY = 'jointjs-playground-graph';
 /** Served from `public/`, so it is editable without touching any code. */
 const DATA_URL = 'graph.json';
@@ -37,6 +34,7 @@ const STYLES: StylesheetStyle[] = [
 
 @Component({
   selector: 'app-diagram',
+  imports: [GraphControls],
   templateUrl: './diagram.html',
   styleUrl: './diagram.scss',
   host: { '(document:keydown)': 'onKeydown($event)' },
@@ -50,29 +48,23 @@ export class Diagram implements AfterViewInit, OnDestroy {
   // needs is mirrored into a signal from the graph/paper event handlers.
   // This app is zoneless (Angular 22 default): signal writes are what schedule
   // change detection, so a plain field assignment would not re-render.
-  readonly nodeCount = signal(0);
-  readonly linkCount = signal(0);
-  readonly zoom = signal(1);
+  /**
+   * The graph, once it exists. A signal because the template has to wait for
+   * it: the paper cannot be built until the canvas element is in the DOM.
+   */
+  protected readonly graph = signal<Graph | null>(null);
+
+  // What the inspector shows. JointJS lives outside Angular's world, so this
+  // is mirrored into signals from the bus. The app is zoneless (Angular 22
+  // default): signal writes are what schedule change detection, so a plain
+  // field assignment would not re-render.
   readonly selectedLabel = signal<string | null>(null);
   readonly selectedJson = signal('');
   readonly selectedIsGroup = signal(false);
-  readonly selectedCollapsed = signal(false);
-  readonly gridVisible = signal(true);
-  readonly edgesHidden = signal(false);
-  readonly valuesVisible = signal(true);
   readonly selectedCol = signal(0);
   readonly selectedRow = signal(0);
-  readonly zoomPercent = computed(() => Math.round(this.zoom() * 100));
 
-  private graph!: Graph;
-  /**
-   * Remembered so the Values toggle can rebuild the edge config; the facade
-   * keeps its own `config` private, as the Cytoscape original does.
-   */
-  private edgeConfig: EdgeConfig = {};
-  private weightLabel: EdgeWeightLabel | undefined;
   private selected: dia.Element | null = null;
-  private nextNodeIndex = 1;
 
   async ngAfterViewInit(): Promise<void> {
     // The WASM router has to be ready before any config asks for it. If it
@@ -85,36 +77,21 @@ export class Diagram implements AfterViewInit, OnDestroy {
       }),
     ]);
 
-    this.graph = new Graph(this.canvas().nativeElement);
-
-    this.graph
+    const graph = new Graph(this.canvas().nativeElement);
+    graph
       .registerStylesheets(data.stylesheets ?? STYLES)
       .setConfig(data.config ?? {})
       .addElements(data.elements)
-      .addEvent({
-        events: 'tap',
-        selector: 'node',
-        handler: ({ cell }) => this.select(cell as dia.Element),
-      })
-      .addEvent({
-        events: 'tap',
-        handler: ({ cell }) => {
-          if (!cell) this.select(null);
-        },
-      })
       .render();
 
-    this.edgeConfig = data.config?.edges ?? {};
-    const label = this.edgeConfig.weight?.label;
-    this.weightLabel = label === false ? undefined : label;
-    this.valuesVisible.set(Boolean(label));
-
-    this.bindGraphEvents();
-    this.sync();
+    this.bindGraphEvents(graph);
+    // Set last: the toolbar is created the moment this is non-null, and it
+    // reads the graph's opening state across as it binds.
+    this.graph.set(graph);
   }
 
   ngOnDestroy(): void {
-    this.graph?.destroy();
+    this.graph()?.destroy();
   }
 
   /**
@@ -123,24 +100,23 @@ export class Diagram implements AfterViewInit, OnDestroy {
    * `takeUntilDestroyed` ends these with the component; the graph completing
    * on `destroy()` would end them too, and either is enough.
    */
-  private bindGraphEvents(): void {
-    const bus = this.graph.eventbus;
+  private bindGraphEvents(graph: Graph): void {
+    const bus = graph.eventbus;
     const ref = this.destroyRef;
+
+    bus
+      .on('selection:changed')
+      .pipe(takeUntilDestroyed(ref))
+      .subscribe(({ cell }) => {
+        this.selected = cell?.isElement() ? (cell as dia.Element) : null;
+        this.showSelected();
+      });
 
     // Coalesced: one notice per tick however many cells moved.
     bus
       .on('graph:changed')
       .pipe(takeUntilDestroyed(ref))
-      .subscribe(({ nodes, links }) => {
-        this.nodeCount.set(nodes);
-        this.linkCount.set(links);
-        this.syncSelection();
-      });
-
-    bus
-      .on('viewport:moved')
-      .pipe(takeUntilDestroyed(ref))
-      .subscribe(({ viewPort }) => this.zoom.set(viewPort.zoom));
+      .subscribe(() => this.showSelected());
 
     bus
       .on('cell:mouseover')
@@ -188,57 +164,21 @@ export class Diagram implements AfterViewInit, OnDestroy {
     );
   }
 
-  /** Reads the whole state across, for the first paint and after a reload. */
-  private sync(): void {
-    const { nodes, edges } = this.graph.data;
-    this.nodeCount.set(nodes.length);
-    this.linkCount.set(edges.length);
-    this.zoom.set(this.graph.viewPort.zoom);
-    this.syncSelection();
-  }
-
-  private syncSelection(): void {
-    // The selection may have been collapsed or removed out from under us.
-    if (this.selected && !this.graph.model.getCell(this.selected.id)) {
-      this.select(null);
-      return;
-    }
-    this.refreshSelected();
-  }
-
-  // --- selection -----------------------------------------------------------
-
-  private select(element: dia.Element | null): void {
-    const { paper } = this.graph;
-
-    if (this.selected && paper) {
-      const previous = this.selected.findView(paper);
-      if (previous) highlighters.mask.remove(previous, SELECTION_ID);
-    }
-
-    this.selected = element;
-    this.refreshSelected();
-
-    if (!element || !paper) return;
-    const view = element.findView(paper);
-    if (!view) return;
-    highlighters.mask.add(view, { selector: 'body' }, SELECTION_ID, {
-      padding: 4,
-      attrs: { stroke: '#6366f1', strokeWidth: 2.5 },
-    });
-  }
-
-  private refreshSelected(): void {
+  /** Mirrors the selected cell into what the inspector renders. */
+  private showSelected(): void {
     const element = this.selected;
+    const graph = this.graph();
+
     this.selectedLabel.set(element ? String(element.attr('label/text') ?? '') : null);
     this.selectedIsGroup.set(element instanceof GroupNode);
-    this.selectedCollapsed.set(element ? isCollapsed(element) : false);
     this.selectedJson.set(element ? JSON.stringify(dataOf(element), null, 2) : '');
 
-    const cell = element ? this.graph.toGrid(element.position()) : { col: 0, row: 0 };
+    const cell = element && graph ? graph.toGrid(element.position()) : { col: 0, row: 0 };
     this.selectedCol.set(cell.col);
     this.selectedRow.set(cell.row);
   }
+
+  // --- selection -----------------------------------------------------------
 
   /** Moves the selected node to a grid cell typed into the inspector. */
   moveSelected(axis: 'col' | 'row', value: string): void {
@@ -252,93 +192,15 @@ export class Diagram implements AfterViewInit, OnDestroy {
       col: axis === 'col' ? parsed : this.selectedCol(),
       row: axis === 'row' ? parsed : this.selectedRow(),
     };
-    this.graph.setNodePosition(String(element.id), position);
-    this.refreshSelected();
+    this.graph()!.setNodePosition(String(element.id), position);
+    this.showSelected();
   }
 
-  // --- toolbar actions -----------------------------------------------------
-
-  addNode(): void {
-    const id = `step-${this.nextNodeIndex++}`;
-    // Drop it in the first free row of column 0.
-    const taken = new Set(Object.values(this.graph.gridPositions()).map((p) => p.row));
-    let row = 0;
-    while (taken.has(row)) row++;
-
-    this.graph.addElements([
-      { data: { id, label: `Step ${this.nextNodeIndex - 1}` }, position: { col: 0, row } },
-    ]);
-    this.select(this.graph.model.getCell(id) as dia.Element);
-  }
+  // --- the inspector -------------------------------------------------------
 
   renameSelected(value: string): void {
     this.selectedLabel.set(value);
     this.selected?.attr('label/text', value);
-  }
-
-  deleteSelected(): void {
-    const element = this.selected;
-    if (!element) return;
-    this.select(null);
-    this.graph.remove(`#${element.id}`);
-  }
-
-  toggleCollapse(): void {
-    const element = this.selected;
-    if (!element) return;
-    if (isCollapsed(element)) this.graph.expand([element]);
-    else this.graph.collapse([element]);
-    this.refreshSelected();
-  }
-
-  toggleGrid(): void {
-    this.gridVisible.update((visible) => !visible);
-    this.graph.eventbus.emit('grid:show', { visible: this.gridVisible() });
-  }
-
-  /** Turns the per-edge weight labels on and off. */
-  toggleValues(): void {
-    this.valuesVisible.update((visible) => !visible);
-    const weight = this.edgeConfig.weight;
-    if (!weight) return;
-    this.edgeConfig = {
-      ...this.edgeConfig,
-      weight: { ...weight, label: this.valuesVisible() ? this.weightLabel : false },
-    };
-    this.graph.setConfig({ edges: this.edgeConfig });
-  }
-
-  /** Shows what `Config.filter` does: hide everything that isn't a node. */
-  toggleEdges(): void {
-    this.edgesHidden.update((hidden) => !hidden);
-    this.graph.setConfig({ filter: this.edgesHidden() ? 'node' : undefined });
-  }
-
-  arrange(): void {
-    this.graph.eventbus.emit('layout:arrange');
-  }
-
-  fit(): void {
-    this.graph.fit();
-    this.sync();
-  }
-
-  zoomBy(step: number): void {
-    // The clamp lives with the graph now; the toolbar only says how far.
-    this.graph.eventbus.emit('viewport:zoom', { by: step });
-  }
-
-  resetZoom(): void {
-    this.graph.eventbus.emit('viewport:set', { pan: { x: 0, y: 0 }, zoom: 1 });
-  }
-
-  clear(): void {
-    this.select(null);
-    this.graph.remove('*');
-  }
-
-  save(): void {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(this.graph.toData()));
   }
 
   load(): void {
@@ -352,30 +214,19 @@ export class Diagram implements AfterViewInit, OnDestroy {
   }
 
   private loadData(data: GraphData): void {
-    this.select(null);
-    this.graph.remove('*');
-    if (data.stylesheets) this.graph.registerStylesheets(data.stylesheets);
-    this.graph.setConfig(data.config ?? {}).addElements(data.elements).render();
-    this.sync();
-  }
+    const graph = this.graph();
+    if (!graph) return;
 
-  exportJson(): void {
-    // Same shape as graph.json, so an export can be dropped straight back in.
-    const blob = new Blob([JSON.stringify(this.graph.toData(), null, 2)], {
-      type: 'application/json',
-    });
-    const url = URL.createObjectURL(blob);
-    const anchor = document.createElement('a');
-    anchor.href = url;
-    anchor.download = 'graph.json';
-    anchor.click();
-    URL.revokeObjectURL(url);
+    graph.select(null);
+    graph.remove('*');
+    if (data.stylesheets) graph.registerStylesheets(data.stylesheets);
+    graph.setConfig(data.config ?? {}).addElements(data.elements).render();
   }
 
   onKeydown(event: KeyboardEvent): void {
     if (event.key !== 'Delete' && event.key !== 'Backspace') return;
     // Don't swallow editing keys while the inspector input has focus.
     if (event.target instanceof HTMLInputElement) return;
-    this.deleteSelected();
+    this.graph()?.eventbus.emit('selection:delete');
   }
 }
