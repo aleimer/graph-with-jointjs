@@ -1,0 +1,1836 @@
+{
+  "config": {
+    "grid": {
+      "cellWidth": 600,
+      "cellHeight": 600
+    },
+    "edges": {
+      "bundle": true,
+      "router": "avoid",
+      "weight": {
+        "field": "litres",
+        "min": 8,
+        "max": 56,
+        "scale": "quantile",
+        "steps": 5,
+        "label": {
+          "unit": " L",
+          "compact": true
+        }
+      }
+    },
+    "collapsed": [],
+    "positions": {
+      "brook-pasture-1": {
+        "col": 0,
+        "row": 0
+      },
+      "brook-pasture-2": {
+        "col": 0,
+        "row": 1
+      },
+      "brook-pasture-3": {
+        "col": 0,
+        "row": 2
+      },
+      "brook-pasture-4": {
+        "col": 0,
+        "row": 3
+      },
+      "brook-stable": {
+        "col": 1,
+        "row": 1
+      },
+      "brook-milkery": {
+        "col": 2,
+        "row": 1
+      },
+      "windmill-pasture-1": {
+        "col": 0,
+        "row": 5
+      },
+      "windmill-pasture-2": {
+        "col": 0,
+        "row": 6
+      },
+      "windmill-pasture-3": {
+        "col": 0,
+        "row": 7
+      },
+      "windmill-stable": {
+        "col": 1,
+        "row": 6
+      },
+      "windmill-milkery": {
+        "col": 2,
+        "row": 6
+      },
+      "alpine-pasture-1": {
+        "col": 0,
+        "row": 9
+      },
+      "alpine-pasture-2": {
+        "col": 0,
+        "row": 10
+      },
+      "alpine-stable": {
+        "col": 1,
+        "row": 9
+      },
+      "alpine-milkery": {
+        "col": 2,
+        "row": 9
+      },
+      "truck-brook": {
+        "col": 3.5,
+        "row": 1
+      },
+      "truck-windmill": {
+        "col": 3.5,
+        "row": 6
+      },
+      "truck-alpine": {
+        "col": 3.5,
+        "row": 9
+      },
+      "station-south": {
+        "col": 5,
+        "row": 3
+      },
+      "milk-train": {
+        "col": 6,
+        "row": 3
+      },
+      "station-north": {
+        "col": 7,
+        "row": 3
+      },
+      "bottling-1": {
+        "col": 8.5,
+        "row": 0
+      },
+      "bottling-2": {
+        "col": 9.5,
+        "row": 0
+      },
+      "bottling-3": {
+        "col": 10.5,
+        "row": 0
+      },
+      "cheese-1": {
+        "col": 8.5,
+        "row": 2
+      },
+      "cheese-2": {
+        "col": 9.5,
+        "row": 2
+      },
+      "cheese-3": {
+        "col": 10.5,
+        "row": 2
+      },
+      "cheese-4": {
+        "col": 11.5,
+        "row": 2
+      },
+      "yogurt-1": {
+        "col": 8.5,
+        "row": 5
+      },
+      "yogurt-2": {
+        "col": 9.5,
+        "row": 5
+      },
+      "yogurt-3": {
+        "col": 10.5,
+        "row": 5
+      },
+      "butter-1": {
+        "col": 8.5,
+        "row": 7
+      },
+      "butter-2": {
+        "col": 9.5,
+        "row": 7
+      },
+      "butter-3": {
+        "col": 10.5,
+        "row": 7
+      },
+      "cold-plant": {
+        "col": 13,
+        "row": 0
+      },
+      "cold-3p": {
+        "col": 13,
+        "row": 5
+      },
+      "cellar": {
+        "col": 13,
+        "row": 2
+      },
+      "warehouse": {
+        "col": 14.5,
+        "row": 2
+      },
+      "labeling": {
+        "col": 14.5,
+        "row": 5
+      },
+      "supermarket": {
+        "col": 16,
+        "row": 0
+      },
+      "grocers": {
+        "col": 16,
+        "row": 2
+      },
+      "online": {
+        "col": 16,
+        "row": 5
+      },
+      "farmshop": {
+        "col": 16,
+        "row": 7
+      },
+      "cafe": {
+        "col": 16,
+        "row": 9
+      },
+      "cust-family": {
+        "col": 17.5,
+        "row": 0
+      },
+      "cust-chef": {
+        "col": 17.5,
+        "row": 2
+      },
+      "cust-student": {
+        "col": 17.5,
+        "row": 5
+      },
+      "cust-local": {
+        "col": 17.5,
+        "row": 7
+      },
+      "cust-barista": {
+        "col": 17.5,
+        "row": 9
+      },
+      "whey-tank": {
+        "col": 10.5,
+        "row": 9
+      },
+      "buttermilk-tank": {
+        "col": 10.5,
+        "row": 11
+      },
+      "whey-tanker": {
+        "col": 13,
+        "row": 10
+      },
+      "piggery": {
+        "col": 16,
+        "row": 10
+      }
+    }
+  },
+  "stylesheets": [
+    {
+      "selector": "#brook-farm",
+      "style": {
+        "body/fill": "#fefce8"
+      }
+    },
+    {
+      "selector": "#windmill-farm",
+      "style": {
+        "body/fill": "#fefce8"
+      }
+    },
+    {
+      "selector": "#alpine-farm",
+      "style": {
+        "body/fill": "#fefce8"
+      }
+    },
+    {
+      "selector": "#bottling-line",
+      "style": {
+        "body/fill": "#eff6ff"
+      }
+    },
+    {
+      "selector": "#cheese-line",
+      "style": {
+        "body/fill": "#eff6ff"
+      }
+    },
+    {
+      "selector": "#yogurt-line",
+      "style": {
+        "body/fill": "#eff6ff"
+      }
+    },
+    {
+      "selector": "#butter-line",
+      "style": {
+        "body/fill": "#eff6ff"
+      }
+    },
+    {
+      "selector": "#channels",
+      "style": {
+        "body/fill": "#f5f3ff"
+      }
+    },
+    {
+      "selector": "node[?shared]",
+      "style": {
+        "body/strokeDasharray": "6,3"
+      }
+    },
+    {
+      "selector": "node[?organic]",
+      "style": {
+        "body/strokeWidth": 2.5
+      }
+    },
+    {
+      "selector": "edge[mode = herd]",
+      "style": {
+        "line/stroke": "#10b981",
+        "line/targetMarker/fill": "#10b981"
+      }
+    },
+    {
+      "selector": "edge[mode = bulk]",
+      "style": {
+        "line/stroke": "#0ea5e9",
+        "line/targetMarker/fill": "#0ea5e9"
+      }
+    },
+    {
+      "selector": "edge[mode = rail]",
+      "style": {
+        "line/stroke": "#475569",
+        "line/targetMarker/fill": "#475569"
+      }
+    },
+    {
+      "selector": "edge[mode = chilled]",
+      "style": {
+        "line/stroke": "#06b6d4",
+        "line/targetMarker/fill": "#06b6d4"
+      }
+    },
+    {
+      "selector": "edge[mode = process]",
+      "style": {
+        "line/stroke": "#3b82f6",
+        "line/targetMarker/fill": "#3b82f6"
+      }
+    },
+    {
+      "selector": "edge[mode = parcel]",
+      "style": {
+        "line/stroke": "#6366f1",
+        "line/targetMarker/fill": "#6366f1"
+      }
+    },
+    {
+      "selector": "edge[mode = counter]",
+      "style": {
+        "line/stroke": "#8b5cf6",
+        "line/targetMarker/fill": "#8b5cf6"
+      }
+    },
+    {
+      "selector": "edge[?waste]",
+      "style": {
+        "line/stroke": "#a855f7",
+        "line/targetMarker/fill": "#a855f7"
+      }
+    }
+  ],
+  "elements": [
+    {
+      "group": "nodes",
+      "type": "GroupNode",
+      "data": {
+        "id": "brook-farm",
+        "label": "Hollow Brook Farm — Brook Dairy Co.",
+        "isParent": true,
+        "owner": "Brook Dairy Co."
+      }
+    },
+    {
+      "group": "nodes",
+      "type": "FieldNode",
+      "data": {
+        "id": "brook-pasture-1",
+        "label": "North Meadow",
+        "parent": "brook-farm",
+        "herd": 1440,
+        "owner": "Brook Dairy Co.",
+        "actual": 34.6,
+        "plan": 45,
+        "unit": "t"
+      }
+    },
+    {
+      "group": "nodes",
+      "type": "FieldNode",
+      "data": {
+        "id": "brook-pasture-2",
+        "label": "Riverside Pasture",
+        "parent": "brook-farm",
+        "herd": 1020,
+        "owner": "Brook Dairy Co.",
+        "actual": 24.5,
+        "plan": 32,
+        "unit": "t"
+      }
+    },
+    {
+      "group": "nodes",
+      "type": "FieldNode",
+      "data": {
+        "id": "brook-pasture-3",
+        "label": "Clover Hill",
+        "parent": "brook-farm",
+        "herd": 1680,
+        "owner": "Brook Dairy Co.",
+        "actual": 40.3,
+        "plan": 53,
+        "unit": "t"
+      }
+    },
+    {
+      "group": "nodes",
+      "type": "FieldNode",
+      "data": {
+        "id": "brook-pasture-4",
+        "label": "Long Acre",
+        "parent": "brook-farm",
+        "herd": 1140,
+        "owner": "Brook Dairy Co.",
+        "actual": 27.4,
+        "plan": 36,
+        "unit": "t"
+      }
+    },
+    {
+      "group": "nodes",
+      "type": "FarmNode",
+      "data": {
+        "id": "brook-stable",
+        "label": "Stable",
+        "parent": "brook-farm",
+        "code": "BST",
+        "owner": "Brook Dairy Co.",
+        "places": 5280,
+        "actual": 126.7,
+        "plan": 152,
+        "unit": "t"
+      }
+    },
+    {
+      "group": "nodes",
+      "type": "FarmNode",
+      "data": {
+        "id": "brook-milkery",
+        "label": "Milking parlour",
+        "parent": "brook-farm",
+        "code": "BML",
+        "owner": "Brook Dairy Co.",
+        "litresPerDay": 126720,
+        "actual": 126.7,
+        "plan": 182,
+        "unit": "t"
+      }
+    },
+    {
+      "group": "nodes",
+      "type": "GroupNode",
+      "data": {
+        "id": "windmill-farm",
+        "label": "Windmill Dairy — Windmill Organics Ltd.",
+        "isParent": true,
+        "owner": "Windmill Organics Ltd."
+      }
+    },
+    {
+      "group": "nodes",
+      "type": "FieldNode",
+      "data": {
+        "id": "windmill-pasture-1",
+        "label": "Mill Field",
+        "parent": "windmill-farm",
+        "herd": 840,
+        "owner": "Windmill Organics Ltd.",
+        "organic": true,
+        "actual": 20.2,
+        "plan": 23,
+        "unit": "t"
+      }
+    },
+    {
+      "group": "nodes",
+      "type": "FieldNode",
+      "data": {
+        "id": "windmill-pasture-2",
+        "label": "Orchard Ley",
+        "parent": "windmill-farm",
+        "herd": 660,
+        "owner": "Windmill Organics Ltd.",
+        "organic": true,
+        "actual": 15.8,
+        "plan": 19,
+        "unit": "t"
+      }
+    },
+    {
+      "group": "nodes",
+      "type": "FieldNode",
+      "data": {
+        "id": "windmill-pasture-3",
+        "label": "Beacon Rise",
+        "parent": "windmill-farm",
+        "herd": 720,
+        "owner": "Windmill Organics Ltd.",
+        "organic": true,
+        "actual": 17.3,
+        "plan": 20,
+        "unit": "t"
+      }
+    },
+    {
+      "group": "nodes",
+      "type": "FarmNode",
+      "data": {
+        "id": "windmill-stable",
+        "label": "Stable",
+        "parent": "windmill-farm",
+        "code": "WST",
+        "owner": "Windmill Organics Ltd.",
+        "places": 2220,
+        "actual": 53.3,
+        "plan": 82,
+        "unit": "t"
+      }
+    },
+    {
+      "group": "nodes",
+      "type": "FarmNode",
+      "data": {
+        "id": "windmill-milkery",
+        "label": "Milking parlour",
+        "parent": "windmill-farm",
+        "code": "WML",
+        "owner": "Windmill Organics Ltd.",
+        "litresPerDay": 53280,
+        "actual": 53.3,
+        "plan": 73,
+        "unit": "t"
+      }
+    },
+    {
+      "group": "nodes",
+      "type": "GroupNode",
+      "data": {
+        "id": "alpine-farm",
+        "label": "Alpine Co-op — Alpenmilch eG",
+        "isParent": true,
+        "owner": "Alpenmilch eG"
+      }
+    },
+    {
+      "group": "nodes",
+      "type": "FieldNode",
+      "data": {
+        "id": "alpine-pasture-1",
+        "label": "Alpine Slope",
+        "parent": "alpine-farm",
+        "herd": 480,
+        "owner": "Alpenmilch eG",
+        "organic": true,
+        "actual": 11.5,
+        "plan": 15,
+        "unit": "t"
+      }
+    },
+    {
+      "group": "nodes",
+      "type": "FieldNode",
+      "data": {
+        "id": "alpine-pasture-2",
+        "label": "Summer Alp",
+        "parent": "alpine-farm",
+        "herd": 420,
+        "owner": "Alpenmilch eG",
+        "organic": true,
+        "actual": 10.1,
+        "plan": 13,
+        "unit": "t"
+      }
+    },
+    {
+      "group": "nodes",
+      "type": "FarmNode",
+      "data": {
+        "id": "alpine-stable",
+        "label": "Stable",
+        "parent": "alpine-farm",
+        "code": "AST",
+        "owner": "Alpenmilch eG",
+        "places": 900,
+        "actual": 21.6,
+        "plan": 27,
+        "unit": "t"
+      }
+    },
+    {
+      "group": "nodes",
+      "type": "FarmNode",
+      "data": {
+        "id": "alpine-milkery",
+        "label": "Milking parlour",
+        "parent": "alpine-farm",
+        "code": "AML",
+        "owner": "Alpenmilch eG",
+        "litresPerDay": 21600,
+        "actual": 21.6,
+        "plan": 29,
+        "unit": "t"
+      }
+    },
+    {
+      "group": "nodes",
+      "type": "TransportNode",
+      "data": {
+        "id": "truck-brook",
+        "label": "Truck route A",
+        "code": "TRA",
+        "mode": "road",
+        "tonnes": 18,
+        "actual": 126.7,
+        "plan": 146,
+        "unit": "t"
+      }
+    },
+    {
+      "group": "nodes",
+      "type": "TransportNode",
+      "data": {
+        "id": "truck-windmill",
+        "label": "Truck route B",
+        "code": "TRB",
+        "mode": "road",
+        "tonnes": 12,
+        "actual": 53.3,
+        "plan": 83,
+        "unit": "t"
+      }
+    },
+    {
+      "group": "nodes",
+      "type": "TransportNode",
+      "data": {
+        "id": "truck-alpine",
+        "label": "Truck route C (direct)",
+        "code": "TRC",
+        "mode": "road",
+        "tonnes": 6,
+        "actual": 21.6,
+        "plan": 25,
+        "unit": "t"
+      }
+    },
+    {
+      "group": "nodes",
+      "type": "TransportNode",
+      "data": {
+        "id": "station-south",
+        "label": "Südbahnhof terminal",
+        "code": "SBF",
+        "sidings": 3,
+        "actual": 180,
+        "plan": 225,
+        "unit": "t"
+      }
+    },
+    {
+      "group": "nodes",
+      "type": "TransportNode",
+      "data": {
+        "id": "milk-train",
+        "label": "Milk train",
+        "code": "TRN",
+        "wagons": 9,
+        "litres": 240000,
+        "actual": 180,
+        "plan": 241,
+        "unit": "t"
+      }
+    },
+    {
+      "group": "nodes",
+      "type": "TransportNode",
+      "data": {
+        "id": "station-north",
+        "label": "Plant siding",
+        "code": "SID",
+        "sidings": 2,
+        "actual": 180,
+        "plan": 279,
+        "unit": "t"
+      }
+    },
+    {
+      "group": "nodes",
+      "type": "GroupNode",
+      "data": {
+        "id": "bottling-line",
+        "label": "Bottling line",
+        "isParent": true
+      }
+    },
+    {
+      "group": "nodes",
+      "type": "FacilityNode",
+      "data": {
+        "id": "bottling-1",
+        "label": "1. Pasteurise",
+        "parent": "bottling-line",
+        "code": "BO1",
+        "step": 1,
+        "temp": "72°C / 15s",
+        "actual": 89.6,
+        "plan": 131,
+        "unit": "t"
+      }
+    },
+    {
+      "group": "nodes",
+      "type": "FacilityNode",
+      "data": {
+        "id": "bottling-2",
+        "label": "2. Homogenise",
+        "parent": "bottling-line",
+        "code": "BO2",
+        "step": 2,
+        "pressure": "180 bar",
+        "actual": 88.7,
+        "plan": 130,
+        "unit": "t"
+      }
+    },
+    {
+      "group": "nodes",
+      "type": "FacilityNode",
+      "data": {
+        "id": "bottling-3",
+        "label": "3. Fill & cap",
+        "parent": "bottling-line",
+        "code": "BO3",
+        "step": 3,
+        "format": "1 L PET",
+        "actual": 88.7,
+        "plan": 131,
+        "unit": "t"
+      }
+    },
+    {
+      "group": "nodes",
+      "type": "GroupNode",
+      "data": {
+        "id": "cheese-line",
+        "label": "Cheese line",
+        "isParent": true
+      }
+    },
+    {
+      "group": "nodes",
+      "type": "FacilityNode",
+      "data": {
+        "id": "cheese-1",
+        "label": "1. Curdling vat",
+        "parent": "cheese-line",
+        "code": "CH1",
+        "step": 1,
+        "culture": "mesophilic",
+        "actual": 25.4,
+        "plan": 40,
+        "unit": "t"
+      }
+    },
+    {
+      "group": "nodes",
+      "type": "FacilityNode",
+      "data": {
+        "id": "cheese-2",
+        "label": "2. Cut & drain",
+        "parent": "cheese-line",
+        "code": "CH2",
+        "step": 2,
+        "yield": "10%",
+        "actual": 45.9,
+        "plan": 72,
+        "unit": "t"
+      }
+    },
+    {
+      "group": "nodes",
+      "type": "FacilityNode",
+      "data": {
+        "id": "cheese-3",
+        "label": "3. Pressing",
+        "parent": "cheese-line",
+        "code": "CH3",
+        "step": 3,
+        "hours": 6,
+        "actual": 24.1,
+        "plan": 38,
+        "unit": "t"
+      }
+    },
+    {
+      "group": "nodes",
+      "type": "FacilityNode",
+      "data": {
+        "id": "cheese-4",
+        "label": "4. Brine bath",
+        "parent": "cheese-line",
+        "code": "CH4",
+        "step": 4,
+        "hours": 24,
+        "actual": 9.7,
+        "plan": 15,
+        "unit": "t"
+      }
+    },
+    {
+      "group": "nodes",
+      "type": "GroupNode",
+      "data": {
+        "id": "yogurt-line",
+        "label": "Yogurt line",
+        "isParent": true
+      }
+    },
+    {
+      "group": "nodes",
+      "type": "FacilityNode",
+      "data": {
+        "id": "yogurt-1",
+        "label": "1. Culture mixing",
+        "parent": "yogurt-line",
+        "code": "YO1",
+        "step": 1,
+        "strains": 2,
+        "actual": 29.9,
+        "plan": 34,
+        "unit": "t"
+      }
+    },
+    {
+      "group": "nodes",
+      "type": "FacilityNode",
+      "data": {
+        "id": "yogurt-2",
+        "label": "2. Incubation",
+        "parent": "yogurt-line",
+        "code": "YO2",
+        "step": 2,
+        "hours": 7,
+        "actual": 29.6,
+        "plan": 34,
+        "unit": "t"
+      }
+    },
+    {
+      "group": "nodes",
+      "type": "FacilityNode",
+      "data": {
+        "id": "yogurt-3",
+        "label": "3. Cool & stir",
+        "parent": "yogurt-line",
+        "code": "YO3",
+        "step": 3,
+        "temp": "4°C",
+        "actual": 29.6,
+        "plan": 34,
+        "unit": "t"
+      }
+    },
+    {
+      "group": "nodes",
+      "type": "GroupNode",
+      "data": {
+        "id": "butter-line",
+        "label": "Butter line",
+        "isParent": true
+      }
+    },
+    {
+      "group": "nodes",
+      "type": "FacilityNode",
+      "data": {
+        "id": "butter-1",
+        "label": "1. Cream separation",
+        "parent": "butter-line",
+        "code": "BU1",
+        "step": 1,
+        "fat": "40%",
+        "actual": 6,
+        "plan": 10,
+        "unit": "t"
+      }
+    },
+    {
+      "group": "nodes",
+      "type": "FacilityNode",
+      "data": {
+        "id": "butter-2",
+        "label": "2. Churning",
+        "parent": "butter-line",
+        "code": "BU2",
+        "step": 2,
+        "minutes": 45,
+        "actual": 19.7,
+        "plan": 33,
+        "unit": "t"
+      }
+    },
+    {
+      "group": "nodes",
+      "type": "FacilityNode",
+      "data": {
+        "id": "butter-3",
+        "label": "3. Kneading & shaping",
+        "parent": "butter-line",
+        "code": "BU3",
+        "step": 3,
+        "format": "250 g",
+        "actual": 5.6,
+        "plan": 9,
+        "unit": "t"
+      }
+    },
+    {
+      "group": "nodes",
+      "type": "StorageNode",
+      "data": {
+        "id": "cold-plant",
+        "label": "Cold store (plant)",
+        "code": "CLP",
+        "owner": "Hollow Brook Creamery",
+        "pallets": 80,
+        "actual": 103.5,
+        "plan": 419,
+        "unit": "t"
+      }
+    },
+    {
+      "group": "nodes",
+      "type": "StorageNode",
+      "data": {
+        "id": "cold-3p",
+        "label": "Cold store (3rd party)",
+        "code": "CL3",
+        "owner": "FrostLink AG",
+        "pallets": 240,
+        "shared": true,
+        "actual": 20.4,
+        "plan": 75,
+        "unit": "t"
+      }
+    },
+    {
+      "group": "nodes",
+      "type": "StorageNode",
+      "data": {
+        "id": "cellar",
+        "label": "Maturing cellar",
+        "weeks": 14,
+        "actual": 9.7,
+        "plan": 32,
+        "unit": "t"
+      }
+    },
+    {
+      "group": "nodes",
+      "type": "StorageNode",
+      "data": {
+        "id": "warehouse",
+        "label": "Shared warehouse",
+        "shared": true,
+        "owner": "FrostLink AG",
+        "actual": 133.6,
+        "plan": 494,
+        "unit": "t"
+      }
+    },
+    {
+      "group": "nodes",
+      "type": "StorageNode",
+      "data": {
+        "id": "labeling",
+        "label": "Labeling & packing",
+        "shared": true,
+        "lines": 4,
+        "actual": 133.2,
+        "plan": 380,
+        "unit": "t"
+      }
+    },
+    {
+      "group": "nodes",
+      "type": "RetailNode",
+      "data": {
+        "id": "supermarket",
+        "label": "Supermarket DC",
+        "parent": "channels",
+        "stores": 48,
+        "actual": 0,
+        "plan": 1,
+        "unit": "t"
+      }
+    },
+    {
+      "group": "nodes",
+      "type": "RetailNode",
+      "data": {
+        "id": "grocers",
+        "label": "City Grocers",
+        "parent": "channels",
+        "stores": 6,
+        "actual": 0.1,
+        "plan": 1,
+        "unit": "t"
+      }
+    },
+    {
+      "group": "nodes",
+      "type": "RetailNode",
+      "data": {
+        "id": "online",
+        "label": "Online shop",
+        "parent": "channels",
+        "subscriptions": 2300,
+        "actual": 0,
+        "plan": 1,
+        "unit": "t"
+      }
+    },
+    {
+      "group": "nodes",
+      "type": "RetailNode",
+      "data": {
+        "id": "farmshop",
+        "label": "Farm shop",
+        "parent": "channels",
+        "onSite": true,
+        "actual": 0.1,
+        "plan": 1,
+        "unit": "t"
+      }
+    },
+    {
+      "group": "nodes",
+      "type": "RetailNode",
+      "data": {
+        "id": "cafe",
+        "label": "Café wholesale",
+        "parent": "channels",
+        "accounts": 34,
+        "actual": 0.1,
+        "plan": 1,
+        "unit": "t"
+      }
+    },
+    {
+      "group": "nodes",
+      "type": "GroupNode",
+      "data": {
+        "id": "channels",
+        "label": "Sales channels",
+        "isParent": true
+      }
+    },
+    {
+      "group": "nodes",
+      "type": "CustomerNode",
+      "data": {
+        "id": "cust-family",
+        "label": "Family household",
+        "actual": 0,
+        "plan": 1,
+        "unit": "t"
+      }
+    },
+    {
+      "group": "nodes",
+      "type": "CustomerNode",
+      "data": {
+        "id": "cust-chef",
+        "label": "Restaurant chef",
+        "actual": 0.1,
+        "plan": 1,
+        "unit": "t"
+      }
+    },
+    {
+      "group": "nodes",
+      "type": "CustomerNode",
+      "data": {
+        "id": "cust-student",
+        "label": "Student flat",
+        "actual": 0,
+        "plan": 1,
+        "unit": "t"
+      }
+    },
+    {
+      "group": "nodes",
+      "type": "CustomerNode",
+      "data": {
+        "id": "cust-local",
+        "label": "Village local",
+        "actual": 0,
+        "plan": 1,
+        "unit": "t"
+      }
+    },
+    {
+      "group": "nodes",
+      "type": "CustomerNode",
+      "data": {
+        "id": "cust-barista",
+        "label": "Barista",
+        "actual": 0.1,
+        "plan": 1,
+        "unit": "t"
+      }
+    },
+    {
+      "group": "nodes",
+      "type": "ByproductNode",
+      "data": {
+        "id": "whey-tank",
+        "label": "Whey tank",
+        "litresPerDay": 9000,
+        "actual": 49.5,
+        "plan": 72,
+        "unit": "t"
+      }
+    },
+    {
+      "group": "nodes",
+      "type": "ByproductNode",
+      "data": {
+        "id": "buttermilk-tank",
+        "label": "Buttermilk tank",
+        "litresPerDay": 2200,
+        "actual": 14.1,
+        "plan": 23,
+        "unit": "t"
+      }
+    },
+    {
+      "group": "nodes",
+      "type": "ByproductNode",
+      "data": {
+        "id": "whey-tanker",
+        "label": "By-product tanker",
+        "mode": "road",
+        "actual": 63.6,
+        "plan": 94,
+        "unit": "t"
+      }
+    },
+    {
+      "group": "nodes",
+      "type": "ByproductNode",
+      "data": {
+        "id": "piggery",
+        "label": "Piggery",
+        "pigs": 400,
+        "actual": 63.6,
+        "plan": 102,
+        "unit": "t"
+      }
+    },
+    {
+      "group": "edges",
+      "data": {
+        "id": "brook-pasture-1__brook-stable",
+        "source": "brook-pasture-1",
+        "target": "brook-stable",
+        "mode": "herd",
+        "litres": 34560
+      }
+    },
+    {
+      "group": "edges",
+      "data": {
+        "id": "brook-pasture-2__brook-stable",
+        "source": "brook-pasture-2",
+        "target": "brook-stable",
+        "mode": "herd",
+        "litres": 24480
+      }
+    },
+    {
+      "group": "edges",
+      "data": {
+        "id": "brook-pasture-3__brook-stable",
+        "source": "brook-pasture-3",
+        "target": "brook-stable",
+        "mode": "herd",
+        "litres": 40320
+      }
+    },
+    {
+      "group": "edges",
+      "data": {
+        "id": "brook-pasture-4__brook-stable",
+        "source": "brook-pasture-4",
+        "target": "brook-stable",
+        "mode": "herd",
+        "litres": 27360
+      }
+    },
+    {
+      "group": "edges",
+      "data": {
+        "id": "brook-stable__brook-milkery",
+        "source": "brook-stable",
+        "target": "brook-milkery",
+        "mode": "herd",
+        "litres": 126720
+      }
+    },
+    {
+      "group": "edges",
+      "data": {
+        "id": "windmill-pasture-1__windmill-stable",
+        "source": "windmill-pasture-1",
+        "target": "windmill-stable",
+        "mode": "herd",
+        "litres": 20160
+      }
+    },
+    {
+      "group": "edges",
+      "data": {
+        "id": "windmill-pasture-2__windmill-stable",
+        "source": "windmill-pasture-2",
+        "target": "windmill-stable",
+        "mode": "herd",
+        "litres": 15840
+      }
+    },
+    {
+      "group": "edges",
+      "data": {
+        "id": "windmill-pasture-3__windmill-stable",
+        "source": "windmill-pasture-3",
+        "target": "windmill-stable",
+        "mode": "herd",
+        "litres": 17280
+      }
+    },
+    {
+      "group": "edges",
+      "data": {
+        "id": "windmill-stable__windmill-milkery",
+        "source": "windmill-stable",
+        "target": "windmill-milkery",
+        "mode": "herd",
+        "litres": 53280
+      }
+    },
+    {
+      "group": "edges",
+      "data": {
+        "id": "alpine-pasture-1__alpine-stable",
+        "source": "alpine-pasture-1",
+        "target": "alpine-stable",
+        "mode": "herd",
+        "litres": 11520
+      }
+    },
+    {
+      "group": "edges",
+      "data": {
+        "id": "alpine-pasture-2__alpine-stable",
+        "source": "alpine-pasture-2",
+        "target": "alpine-stable",
+        "mode": "herd",
+        "litres": 10080
+      }
+    },
+    {
+      "group": "edges",
+      "data": {
+        "id": "alpine-stable__alpine-milkery",
+        "source": "alpine-stable",
+        "target": "alpine-milkery",
+        "mode": "herd",
+        "litres": 21600
+      }
+    },
+    {
+      "group": "edges",
+      "data": {
+        "id": "brook-milkery__truck-brook",
+        "source": "brook-milkery",
+        "target": "truck-brook",
+        "mode": "bulk",
+        "litres": 126720
+      }
+    },
+    {
+      "group": "edges",
+      "data": {
+        "id": "windmill-milkery__truck-windmill",
+        "source": "windmill-milkery",
+        "target": "truck-windmill",
+        "mode": "bulk",
+        "litres": 53280
+      }
+    },
+    {
+      "group": "edges",
+      "data": {
+        "id": "alpine-milkery__truck-alpine",
+        "source": "alpine-milkery",
+        "target": "truck-alpine",
+        "mode": "chilled",
+        "litres": 21600
+      }
+    },
+    {
+      "group": "edges",
+      "data": {
+        "id": "truck-brook__station-south",
+        "source": "truck-brook",
+        "target": "station-south",
+        "mode": "bulk",
+        "litres": 126720
+      }
+    },
+    {
+      "group": "edges",
+      "data": {
+        "id": "truck-windmill__station-south",
+        "source": "truck-windmill",
+        "target": "station-south",
+        "mode": "bulk",
+        "litres": 53280
+      }
+    },
+    {
+      "group": "edges",
+      "data": {
+        "id": "station-south__milk-train",
+        "source": "station-south",
+        "target": "milk-train",
+        "mode": "rail",
+        "litres": 180000
+      }
+    },
+    {
+      "group": "edges",
+      "data": {
+        "id": "milk-train__station-north",
+        "source": "milk-train",
+        "target": "station-north",
+        "mode": "rail",
+        "litres": 180000
+      }
+    },
+    {
+      "group": "edges",
+      "data": {
+        "id": "bottling-1__bottling-2",
+        "source": "bottling-1",
+        "target": "bottling-2",
+        "mode": "process",
+        "litres": 89635
+      }
+    },
+    {
+      "group": "edges",
+      "data": {
+        "id": "bottling-2__bottling-3",
+        "source": "bottling-2",
+        "target": "bottling-3",
+        "mode": "process",
+        "litres": 88729
+      }
+    },
+    {
+      "group": "edges",
+      "data": {
+        "id": "station-north__bottling-1",
+        "source": "station-north",
+        "target": "bottling-1",
+        "mode": "bulk",
+        "litres": 81000
+      }
+    },
+    {
+      "group": "edges",
+      "data": {
+        "id": "truck-alpine__bottling-1",
+        "source": "truck-alpine",
+        "target": "bottling-1",
+        "mode": "chilled",
+        "litres": 9540,
+        "seasonal": false
+      }
+    },
+    {
+      "group": "edges",
+      "data": {
+        "id": "cheese-1__cheese-2",
+        "source": "cheese-1",
+        "target": "cheese-2",
+        "mode": "process",
+        "litres": 25351
+      }
+    },
+    {
+      "group": "edges",
+      "data": {
+        "id": "cheese-2__cheese-3",
+        "source": "cheese-2",
+        "target": "cheese-3",
+        "mode": "process",
+        "litres": 10865
+      }
+    },
+    {
+      "group": "edges",
+      "data": {
+        "id": "cheese-3__cheese-4",
+        "source": "cheese-3",
+        "target": "cheese-4",
+        "mode": "process",
+        "litres": 9658
+      }
+    },
+    {
+      "group": "edges",
+      "data": {
+        "id": "station-north__cheese-1",
+        "source": "station-north",
+        "target": "cheese-1",
+        "mode": "bulk",
+        "litres": 54000
+      }
+    },
+    {
+      "group": "edges",
+      "data": {
+        "id": "truck-alpine__cheese-1",
+        "source": "truck-alpine",
+        "target": "cheese-1",
+        "mode": "chilled",
+        "litres": 6360,
+        "seasonal": true
+      }
+    },
+    {
+      "group": "edges",
+      "data": {
+        "id": "yogurt-1__yogurt-2",
+        "source": "yogurt-1",
+        "target": "yogurt-2",
+        "mode": "process",
+        "litres": 29878
+      }
+    },
+    {
+      "group": "edges",
+      "data": {
+        "id": "yogurt-2__yogurt-3",
+        "source": "yogurt-2",
+        "target": "yogurt-3",
+        "mode": "process",
+        "litres": 29576
+      }
+    },
+    {
+      "group": "edges",
+      "data": {
+        "id": "station-north__yogurt-1",
+        "source": "station-north",
+        "target": "yogurt-1",
+        "mode": "bulk",
+        "litres": 27000
+      }
+    },
+    {
+      "group": "edges",
+      "data": {
+        "id": "truck-alpine__yogurt-1",
+        "source": "truck-alpine",
+        "target": "yogurt-1",
+        "mode": "chilled",
+        "litres": 3180,
+        "seasonal": false
+      }
+    },
+    {
+      "group": "edges",
+      "data": {
+        "id": "butter-1__butter-2",
+        "source": "butter-1",
+        "target": "butter-2",
+        "mode": "process",
+        "litres": 6036
+      }
+    },
+    {
+      "group": "edges",
+      "data": {
+        "id": "butter-2__butter-3",
+        "source": "butter-2",
+        "target": "butter-3",
+        "mode": "process",
+        "litres": 5634
+      }
+    },
+    {
+      "group": "edges",
+      "data": {
+        "id": "station-north__butter-1",
+        "source": "station-north",
+        "target": "butter-1",
+        "mode": "bulk",
+        "litres": 18000
+      }
+    },
+    {
+      "group": "edges",
+      "data": {
+        "id": "truck-alpine__butter-1",
+        "source": "truck-alpine",
+        "target": "butter-1",
+        "mode": "chilled",
+        "litres": 2120,
+        "seasonal": false
+      }
+    },
+    {
+      "group": "edges",
+      "data": {
+        "id": "bottling-3__cold-plant",
+        "source": "bottling-3",
+        "target": "cold-plant",
+        "mode": "chilled",
+        "litres": 88729
+      }
+    },
+    {
+      "group": "edges",
+      "data": {
+        "id": "yogurt-3__cold-plant",
+        "source": "yogurt-3",
+        "target": "cold-plant",
+        "mode": "chilled",
+        "litres": 14788
+      }
+    },
+    {
+      "group": "edges",
+      "data": {
+        "id": "yogurt-3__cold-3p",
+        "source": "yogurt-3",
+        "target": "cold-3p",
+        "mode": "chilled",
+        "litres": 14788
+      }
+    },
+    {
+      "group": "edges",
+      "data": {
+        "id": "cheese-4__cellar",
+        "source": "cheese-4",
+        "target": "cellar",
+        "mode": "process",
+        "litres": 9658
+      }
+    },
+    {
+      "group": "edges",
+      "data": {
+        "id": "butter-3__cold-3p",
+        "source": "butter-3",
+        "target": "cold-3p",
+        "mode": "chilled",
+        "litres": 5634
+      }
+    },
+    {
+      "group": "edges",
+      "data": {
+        "id": "cold-plant__warehouse",
+        "source": "cold-plant",
+        "target": "warehouse",
+        "mode": "chilled",
+        "litres": 103517
+      }
+    },
+    {
+      "group": "edges",
+      "data": {
+        "id": "cold-3p__warehouse",
+        "source": "cold-3p",
+        "target": "warehouse",
+        "mode": "chilled",
+        "litres": 20422
+      }
+    },
+    {
+      "group": "edges",
+      "data": {
+        "id": "cellar__warehouse",
+        "source": "cellar",
+        "target": "warehouse",
+        "mode": "chilled",
+        "label": "14 wks",
+        "litres": 9658
+      }
+    },
+    {
+      "group": "edges",
+      "data": {
+        "id": "warehouse__labeling",
+        "source": "warehouse",
+        "target": "labeling",
+        "mode": "internal",
+        "litres": 133197
+      }
+    },
+    {
+      "group": "edges",
+      "data": {
+        "id": "labeling__supermarket",
+        "source": "labeling",
+        "target": "supermarket",
+        "mode": "chilled",
+        "litres": 73258
+      }
+    },
+    {
+      "group": "edges",
+      "data": {
+        "id": "labeling__grocers",
+        "source": "labeling",
+        "target": "grocers",
+        "mode": "chilled",
+        "litres": 26639
+      }
+    },
+    {
+      "group": "edges",
+      "data": {
+        "id": "labeling__online",
+        "source": "labeling",
+        "target": "online",
+        "mode": "parcel",
+        "litres": 22643
+      }
+    },
+    {
+      "group": "edges",
+      "data": {
+        "id": "labeling__cafe",
+        "source": "labeling",
+        "target": "cafe",
+        "mode": "chilled",
+        "litres": 10656
+      }
+    },
+    {
+      "group": "edges",
+      "data": {
+        "id": "warehouse__farmshop",
+        "source": "warehouse",
+        "target": "farmshop",
+        "mode": "chilled",
+        "litres": 400
+      }
+    },
+    {
+      "group": "edges",
+      "data": {
+        "id": "truck-alpine__farmshop",
+        "source": "truck-alpine",
+        "target": "farmshop",
+        "mode": "chilled",
+        "label": "raw",
+        "litres": 400
+      }
+    },
+    {
+      "group": "edges",
+      "data": {
+        "id": "supermarket__cust-family",
+        "source": "supermarket",
+        "target": "cust-family",
+        "mode": "counter",
+        "litres": 14
+      }
+    },
+    {
+      "group": "edges",
+      "data": {
+        "id": "supermarket__cust-student",
+        "source": "supermarket",
+        "target": "cust-student",
+        "mode": "counter",
+        "litres": 6
+      }
+    },
+    {
+      "group": "edges",
+      "data": {
+        "id": "grocers__cust-chef",
+        "source": "grocers",
+        "target": "cust-chef",
+        "mode": "counter",
+        "litres": 90
+      }
+    },
+    {
+      "group": "edges",
+      "data": {
+        "id": "grocers__cust-family",
+        "source": "grocers",
+        "target": "cust-family",
+        "mode": "counter",
+        "litres": 11
+      }
+    },
+    {
+      "group": "edges",
+      "data": {
+        "id": "online__cust-student",
+        "source": "online",
+        "target": "cust-student",
+        "mode": "parcel",
+        "label": "weekly box",
+        "litres": 4
+      }
+    },
+    {
+      "group": "edges",
+      "data": {
+        "id": "online__cust-family",
+        "source": "online",
+        "target": "cust-family",
+        "mode": "parcel",
+        "litres": 9
+      }
+    },
+    {
+      "group": "edges",
+      "data": {
+        "id": "farmshop__cust-local",
+        "source": "farmshop",
+        "target": "cust-local",
+        "mode": "counter",
+        "litres": 7
+      }
+    },
+    {
+      "group": "edges",
+      "data": {
+        "id": "farmshop__cust-chef",
+        "source": "farmshop",
+        "target": "cust-chef",
+        "mode": "counter",
+        "litres": 45
+      }
+    },
+    {
+      "group": "edges",
+      "data": {
+        "id": "cafe__cust-barista",
+        "source": "cafe",
+        "target": "cust-barista",
+        "mode": "counter",
+        "litres": 120
+      }
+    },
+    {
+      "group": "edges",
+      "data": {
+        "id": "cheese-2__whey-tank",
+        "source": "cheese-2",
+        "target": "whey-tank",
+        "waste": true,
+        "label": "whey",
+        "litres": 35009
+      }
+    },
+    {
+      "group": "edges",
+      "data": {
+        "id": "cheese-3__whey-tank",
+        "source": "cheese-3",
+        "target": "whey-tank",
+        "waste": true,
+        "litres": 14486
+      }
+    },
+    {
+      "group": "edges",
+      "data": {
+        "id": "butter-2__buttermilk-tank",
+        "source": "butter-2",
+        "target": "buttermilk-tank",
+        "waste": true,
+        "label": "buttermilk",
+        "litres": 14084
+      }
+    },
+    {
+      "group": "edges",
+      "data": {
+        "id": "whey-tank__whey-tanker",
+        "source": "whey-tank",
+        "target": "whey-tanker",
+        "waste": true,
+        "litres": 49495
+      }
+    },
+    {
+      "group": "edges",
+      "data": {
+        "id": "buttermilk-tank__whey-tanker",
+        "source": "buttermilk-tank",
+        "target": "whey-tanker",
+        "waste": true,
+        "litres": 14084
+      }
+    },
+    {
+      "group": "edges",
+      "data": {
+        "id": "whey-tanker__piggery",
+        "source": "whey-tanker",
+        "target": "piggery",
+        "waste": true,
+        "mode": "road",
+        "litres": 63579
+      }
+    }
+  ]
+}

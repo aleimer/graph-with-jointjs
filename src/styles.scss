@@ -1,0 +1,26 @@
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  height: 100%;
+  margin: 0;
+}
+
+body {
+  font-family: Inter, system-ui, sans-serif;
+  background: #f8fafc;
+}
+
+/* JointJS 4 ships no stylesheet; link/tool chrome is styled via SVG attrs.
+   These few rules just tame the paper wrapper and the hover tools. */
+.joint-paper {
+  display: block;
+}
+
+.joint-link__tooltip {
+  display: none;
+}

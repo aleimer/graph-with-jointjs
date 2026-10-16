@@ -1,0 +1,82 @@
+<header class="toolbar">
+  <span class="brand">JointJS playground</span>
+
+  <div class="group">
+    <button type="button" (click)="addNode()">Add node</button>
+    <button type="button" (click)="deleteSelected()" [disabled]="selectedLabel() === null">
+      Delete
+    </button>
+    <button type="button" (click)="toggleCollapse()" [disabled]="!selectedIsGroup()">
+      {{ selectedCollapsed() ? 'Expand' : 'Collapse' }}
+    </button>
+    <button type="button" (click)="arrange()">Arrange</button>
+  </div>
+
+  <div class="group">
+    <button type="button" (click)="zoomBy(-0.2)">&minus;</button>
+    <button type="button" class="zoom" (click)="resetZoom()">{{ zoomPercent() }}%</button>
+    <button type="button" (click)="zoomBy(0.2)">+</button>
+    <button type="button" (click)="fit()">Fit</button>
+  </div>
+
+  <div class="group">
+    <button type="button" [class.is-off]="!gridVisible()" (click)="toggleGrid()">Grid</button>
+    <button type="button" [class.is-off]="edgesHidden()" (click)="toggleEdges()">Edges</button>
+    <button type="button" [class.is-off]="!valuesVisible()" (click)="toggleValues()">Values</button>
+  </div>
+
+  <div class="group">
+    <button type="button" (click)="save()">Save</button>
+    <button type="button" (click)="load()">Load</button>
+    <button type="button" (click)="reload()">Reload JSON</button>
+    <button type="button" (click)="exportJson()">Export</button>
+    <button type="button" (click)="clear()">Clear</button>
+  </div>
+
+  <span class="stats">{{ nodeCount() }} nodes &middot; {{ linkCount() }} links</span>
+</header>
+
+<main class="workspace">
+  <div #canvas class="canvas"></div>
+
+  @if (selectedLabel() !== null) {
+    <aside class="inspector">
+      <label class="field">
+        <span>Label</span>
+        <input
+          type="text"
+          [value]="selectedLabel()"
+          (input)="renameSelected($any($event.target).value)"
+        />
+      </label>
+
+      <div class="grid-field">
+        <label class="field">
+          <span>Column</span>
+          <input
+            type="number"
+            [value]="selectedCol()"
+            (input)="moveSelected('col', $any($event.target).value)"
+          />
+        </label>
+        <label class="field">
+          <span>Row</span>
+          <input
+            type="number"
+            [value]="selectedRow()"
+            (input)="moveSelected('row', $any($event.target).value)"
+          />
+        </label>
+      </div>
+
+      <p class="hint">
+        @if (selectedIsGroup()) {
+          Group node — collapsing stashes its children and re-points crossing edges at the group.
+        } @else {
+          Element <code>data</code>, as passed to <code>addElements()</code>:
+        }
+      </p>
+      <pre>{{ selectedJson() }}</pre>
+    </aside>
+  }
+</main>
