@@ -254,6 +254,37 @@ they crowd the view — they are legible from about 70% zoom upward.
 In the demo the field is litres per day, which runs from 4 (a student's weekly box) to
 15,000 (the milk train), and every volume derives from `LITRES_PER_COW` in the generator.
 
+### Knowing when it is ready
+
+The facade announces getting a graph on screen as four phases on the bus, each
+with a start and a finish, so a consumer can say *what* is happening rather
+than only that something is:
+
+| phase | raised by | what it covers |
+| --- | --- | --- |
+| `fetching` | the caller, via `graph.during()` | reading the data from wherever it lives |
+| `building` | `addElements()` | definitions becoming cells |
+| `rendering` | `render()` | positions, styles, groups |
+| `routing` | the router | links being drawn; the diagram is not final until it ends |
+
+`load:ready` follows the first routing to settle after a render, carrying the
+time from the first phase. It is the one to wait for.
+
+```ts
+graph.eventbus.on('load:start').subscribe(({ phase }) => spinner.show(phase));
+graph.eventbus.on('load:ready').subscribe(({ ms }) => spinner.hide(ms));
+
+// the one phase the facade cannot see for itself
+const data = await graph.during('fetching', () => fetch(url).then((r) => r.json()));
+```
+
+`during()` returns whatever the work returned and waits for it if it is a
+promise, so it wraps an existing call without changing its shape. A failure is
+announced as `load:failed` and then rethrown — it reports, it does not swallow.
+
+On the dairy graph the phases come out at roughly 22ms fetching, 233ms
+building, 113ms rendering and 223ms routing, ready at 591ms.
+
 Open work is tracked in [TODO.md](TODO.md), with what was measured about each.
 
 ## Routing acceptance criteria

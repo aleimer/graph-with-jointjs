@@ -10,6 +10,7 @@ import {
   ZOOM_MIN,
 } from './constants';
 import { Groups } from './groups';
+import type { LoadPhase } from './events';
 import { EventBus, POINTER_EVENTS, jointNameFor, pointerEventName } from './events';
 import { installInteraction } from './interaction';
 import { createPaper, drawGrid } from './paper';
@@ -124,6 +125,55 @@ export default class Graph {
   }
 
   /**
+   * Runs `work` as a named phase of getting a graph on screen, announcing it
+   * on the bus: `load:start` before, then `load:done` or `load:failed`.
+   *
+   * The facade raises `building`, `rendering` and `routing` itself. This is
+   * for the phase it cannot see — reading the data, wherever that comes from:
+   *
+   *     const data = await graph.during('fetching', () => fetch(url).then(r => r.json()));
+   *
+   * Returns whatever `work` returns, and waits for it if it is a promise, so
+   * it can be dropped around an existing call without changing its shape.
+   * A failure is announced and then rethrown: this reports, it does not
+   * swallow.
+   */
+  during<T>(phase: LoadPhase, work: () => T): T {
+    const started = performance.now();
+    const since = () => Math.round(performance.now() - started);
+
+    if (this.loadStartedAt === null) this.loadStartedAt = started;
+    this.eventbus.emit('load:start', { phase });
+
+    const done = () => this.eventbus.emit('load:done', { phase, ms: since() });
+    const failed = (error: unknown) => {
+      this.loadStartedAt = null;
+      this.eventbus.emit('load:failed', { phase, error });
+    };
+
+    try {
+      const result = work();
+      if (result instanceof Promise) {
+        return result.then(
+          (value) => {
+            done();
+            return value;
+          },
+          (error: unknown) => {
+            failed(error);
+            throw error;
+          },
+        ) as T;
+      }
+      done();
+      return result;
+    } catch (error) {
+      failed(error);
+      throw error;
+    }
+  }
+
+  /**
    * Routing passes run so far, or 0 when the built-in router is in use.
    * A diagnostic: see `AvoidRouter.passes`.
    */
@@ -148,6 +198,10 @@ export default class Graph {
   private flushQueued = false;
   /** True while a `changed` notice is already queued for the end of this tick. */
   private changeQueued = false;
+  /** When the load in progress began, for `load:ready`; null between loads. */
+  private loadStartedAt: number | null = null;
+  /** True once render() has run and the routing that follows it is awaited. */
+  private awaitingReady = false;
   /** Spacing of the light mesh; the major lines sit every `MAJOR_GRID`. */
   private gridSpacing = MINOR_GRID;
   private grid: GridSize = DEFAULT_GRID;
@@ -265,6 +319,10 @@ export default class Graph {
   }
 
   addElements(elements: ElementDefinition[]): this {
+    return this.during('building', () => this.addElementsNow(elements));
+  }
+
+  private addElementsNow(elements: ElementDefinition[]): this {
     const nodes = elements.filter(
       (element): element is NodeDefinition =>
         element.group === 'nodes' || !('source' in element.data),
@@ -317,6 +375,13 @@ export default class Graph {
   }
 
   render(): this {
+    return this.during('rendering', () => this.renderNow());
+  }
+
+  private renderNow(): this {
+    // Routing follows a render, so `load:ready` waits for it rather than
+    // calling the graph finished while its links are still being drawn.
+    this.awaitingReady = true;
     this.setPosition();
     this.isRendered = true;
     this.restyle();
@@ -650,6 +715,7 @@ export default class Graph {
       // Attachments snap to the same grid the nodes are placed on.
       lane: this.gridSpacing,
       strategy: this._config.edges?.strategy,
+      onRouting: (busy, ms) => this.announceRouting(busy, ms),
     });
   }
 
@@ -776,6 +842,25 @@ export default class Graph {
       padding: 4,
       attrs: { stroke: '#6366f1', strokeWidth: 2.5 },
     });
+  }
+
+  /**
+   * Turns the router's runs into the `routing` phase, and calls the load done
+   * when the first run after a render settles.
+   */
+  private announceRouting(busy: boolean, ms: number): void {
+    if (busy) {
+      this.eventbus.emit('load:start', { phase: 'routing' });
+      return;
+    }
+
+    this.eventbus.emit('load:done', { phase: 'routing', ms });
+    if (!this.awaitingReady) return;
+
+    this.awaitingReady = false;
+    const total = this.loadStartedAt === null ? ms : Math.round(performance.now() - this.loadStartedAt);
+    this.loadStartedAt = null;
+    this.eventbus.emit('load:ready', { ms: total });
   }
 
   /** Announces that the model changed, once for this tick. */

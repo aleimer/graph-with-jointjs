@@ -66,25 +66,31 @@ export class Diagram implements AfterViewInit, OnDestroy {
     // The WASM router has to be ready before any config asks for it. If it
     // cannot be fetched the graph still draws, falling back to the built-in
     // router, so a missing binary degrades instead of showing nothing.
-    const [data] = await Promise.all([
-      fetch(DATA_URL).then((response) => response.json() as Promise<GraphData>),
-      AvoidRouter.load().catch((error: unknown) => {
-        console.warn('[diagram] libavoid unavailable, using the manhattan router', error);
-      }),
-    ]);
-
     const graph = new Graph(this.canvas().nativeElement);
+
+    // A handle for the console and for tools/check-acceptance.mjs, which has
+    // no other way in. Set before anything is loaded, so a watcher can see
+    // the load happen. Development only: nothing should depend on it.
+    if (isDevMode()) {
+      (globalThis as unknown as { graph?: Graph }).graph = graph;
+    }
+
+    // `fetching` is the one phase the facade cannot raise for itself: only
+    // the caller knows where the data comes from. The rest it announces.
+    const [data] = await graph.during('fetching', () =>
+      Promise.all([
+        fetch(DATA_URL).then((response) => response.json() as Promise<GraphData>),
+        AvoidRouter.load().catch((error: unknown) => {
+          console.warn('[diagram] libavoid unavailable, using the manhattan router', error);
+        }),
+      ]),
+    );
+
     graph
       .registerStylesheets(data.stylesheets ?? STYLES)
       .setConfig(withStrategy(data.config ?? {}))
       .addElements(data.elements)
       .render();
-
-    // A handle for the console and for tools/check-acceptance.mjs, which has
-    // no other way in. Development only: nothing should depend on it.
-    if (isDevMode()) {
-      (globalThis as unknown as { graph?: Graph }).graph = graph;
-    }
 
     this.bindHoverTools(graph);
     // Set last: the toolbar is created the moment this is non-null, and it

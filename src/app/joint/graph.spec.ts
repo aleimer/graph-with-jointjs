@@ -612,6 +612,48 @@ describe('Graph facade', () => {
     expect(graph.model.getCell('transform').get('z')).toBeGreaterThan(GroupNode.Z);
   });
 
+  it('announces each phase of a load, in order', async () => {
+    const seen: string[] = [];
+    graph.eventbus.on('load:start').subscribe(({ phase }) => seen.push(`start:${phase}`));
+    graph.eventbus.on('load:done').subscribe(({ phase }) => seen.push(`done:${phase}`));
+
+    const data = await graph.during('fetching', () => Promise.resolve([{ data: { id: 'x' } }]));
+    graph.addElements(data as ElementDefinition[]);
+    graph.render();
+
+    expect(seen).toEqual([
+      'start:fetching',
+      'done:fetching',
+      'start:building',
+      'done:building',
+      'start:rendering',
+      'done:rendering',
+    ]);
+  });
+
+  it('reports the phase that failed, and lets the failure through', async () => {
+    const failures: { phase: string; error: unknown }[] = [];
+    graph.eventbus.on('load:failed').subscribe((e) => failures.push(e));
+
+    const boom = new Error('no data');
+    await expect(graph.during('fetching', () => Promise.reject(boom))).rejects.toThrow('no data');
+
+    // Synchronous work is reported the same way.
+    expect(() =>
+      graph.during('building', () => {
+        throw boom;
+      }),
+    ).toThrow('no data');
+
+    expect(failures.map((f) => f.phase)).toEqual(['fetching', 'building']);
+    expect(failures[0].error).toBe(boom);
+  });
+
+  it('returns what the work returned, so it can wrap an existing call', async () => {
+    expect(graph.during('building', () => 42)).toBe(42);
+    await expect(graph.during('fetching', () => Promise.resolve('ok'))).resolves.toBe('ok');
+  });
+
   it('round-trips the viewport', () => {
     graph.setViewPort({ pan: { x: 40, y: -20 }, zoom: 1.5 });
     graph.saveCurrentViewPort();

@@ -46,6 +46,26 @@ export interface GraphEvents {
   /** The diagram switched between reading and editing. */
   'mode:changed': { mode: GraphMode };
 
+  // --- getting a graph on screen ---------------------------------------------
+  //
+  // Four phases, always in this order, each announcing its own start and
+  // finish. Enough for a consumer to say what is happening rather than only
+  // that something is, and the facade raises the three it owns without being
+  // asked — a caller that does nothing still gets the catalog.
+  //
+  //   fetching   the data is being read from wherever it lives (the caller's
+  //              phase: only it knows where that is)
+  //   building   definitions are becoming cells
+  //   rendering  positions, styles and groups are applied
+  //   routing    links are being drawn; the diagram is not final until it ends
+  //
+  // `load:ready` follows the first routing to settle after a render, with the
+  // time from the first phase of the load. It is the one to wait for.
+  'load:start': { phase: LoadPhase };
+  'load:done': { phase: LoadPhase; ms: number };
+  'load:failed': { phase: LoadPhase; error: unknown };
+  'load:ready': { ms: number };
+
   // --- asked of the graph ----------------------------------------------------
   'viewport:zoom': { by?: number; to?: number };
   'viewport:fit': void;
@@ -61,6 +81,9 @@ export interface GraphEvents {
   'selection:collapse': void;
   'mode:set': { mode: GraphMode };
 }
+
+/** The stages a graph goes through on its way to being on screen. */
+export type LoadPhase = 'fetching' | 'building' | 'rendering' | 'routing';
 
 /** A pointer event on a cell, or on blank paper when `cell` is null. */
 export interface PointerEvent extends EventObject {

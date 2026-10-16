@@ -32,6 +32,11 @@ export interface AvoidRouterOptions {
   /** Which halves of the routing cascade are in play. Defaults to `combined`. */
   strategy?: RouteStrategy;
   /**
+   * Told when routing starts and when it settles, so a caller can say the
+   * diagram is not final yet. `ms` is how long the run took, on settling.
+   */
+  onRouting?: (busy: boolean, ms: number) => void;
+  /**
    * The grid pitch attachment points snap to. Links leave and enter a node on
    * grid lines, and turn one lane clear of it, so the corridors line up with
    * the grid the nodes are placed on. Halved as needed when a node has more
@@ -91,6 +96,9 @@ export class AvoidRouter {
   private held = false;
   /** Routing passes run since this router was built. */
   private passCount = 0;
+  /** When the current run of passes began, or null between runs. */
+  private runStartedAt: number | null = null;
+  private readonly onRouting?: (busy: boolean, ms: number) => void;
   /** A change arrived while held, so a pass is owed once it is released. */
   private owed = false;
   /** Links drawn straight while their node is being dragged. */
@@ -137,6 +145,7 @@ export class AvoidRouter {
     this.lane = options.lane ?? 75;
     this.clearance = options.clearance ?? 12;
     this.strategy = options.strategy ?? 'combined';
+    this.onRouting = options.onRouting;
 
     // Embind exposes enum members as objects; the Router constructor takes a
     // raw bitfield, so the numeric `.value` is required here (the routing
@@ -1368,6 +1377,13 @@ export class AvoidRouter {
     if (this.destroyed || !this.connectors.size) return;
     this.passCount++;
 
+    // A run is every pass up to the point nothing more is queued: one drop
+    // can take a repair pass or two, and that is one wait, not three.
+    if (this.runStartedAt === null) {
+      this.runStartedAt = performance.now();
+      this.onRouting?.(true, 0);
+    }
+
     // A corridor override repairs one layout. Carried into the next it forces
     // a link into a corridor chosen for geometry that has since moved, and
     // because the repair pass can only add overrides, never drop them, they
@@ -1409,6 +1425,12 @@ export class AvoidRouter {
     }
 
     this.sizeJumps();
+
+    if (this.frame === null && this.runStartedAt !== null) {
+      const ms = Math.round(performance.now() - this.runStartedAt);
+      this.runStartedAt = null;
+      this.onRouting?.(false, ms);
+    }
   }
 
   /**
