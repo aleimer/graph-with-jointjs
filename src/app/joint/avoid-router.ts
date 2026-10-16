@@ -394,10 +394,10 @@ export class AvoidRouter {
       let sourceSide: Side;
       let targetSide: Side;
 
-      if (inRow) {
+      if (inRow && straight) {
         sourceSide = dx >= 0 ? 'right' : 'left';
         targetSide = OPPOSITE[sourceSide];
-      } else if (inColumn) {
+      } else if (inColumn && straight) {
         sourceSide = dy >= 0 ? 'bottom' : 'top';
         targetSide = OPPOSITE[sourceSide];
       } else {
@@ -429,14 +429,34 @@ export class AvoidRouter {
           // A link that drops much further than it travels (the waste lines
           // falling out of the production rows) is a drop, and gets the
           // top-to-bottom pair first; anything else is a traverse.
+          // Two nodes in the same column have no sideways direction to
+          // prefer, and docking the far end on the *opposite* side would send
+          // the link across the node it is arriving at to reach it. Same side
+          // at both ends instead: out, along the gutter, and back in the way
+          // it came. Either side will do, so both are offered.
+          const flat = Math.abs(dx) < 1;
+          const plumb = Math.abs(dy) < 1;
+
+          const upright: [Side, Side][] = plumb
+            ? [
+                ['bottom', 'bottom'],
+                ['top', 'top'],
+              ]
+            : [[dy >= 0 ? 'bottom' : 'top', dy >= 0 ? 'top' : 'bottom']];
+          const sideways: [Side, Side][] = flat
+            ? [
+                ['right', 'right'],
+                ['left', 'left'],
+              ]
+            : [[dx >= 0 ? 'right' : 'left', dx >= 0 ? 'left' : 'right']];
+
           const drop = Math.abs(dy) >= Math.abs(dx) * DROP_RATIO;
-          const upright: [Side, Side] = [dy >= 0 ? 'bottom' : 'top', dy >= 0 ? 'top' : 'bottom'];
-          const sideways: [Side, Side] = [dx >= 0 ? 'right' : 'left', dx >= 0 ? 'left' : 'right'];
-          const order: [Side, Side][] = drop ? [upright, sideways] : [sideways, upright];
+          const order = drop ? [...upright, ...sideways] : [...sideways, ...upright];
 
           [sourceSide, targetSide] =
-            order.find(([side]) => this.canDogLeg(HORIZONTAL[side] ? 'x' : 'y', from, to, endIds)) ??
-            order[0];
+            order.find(([side]) =>
+              this.canDogLeg(HORIZONTAL[side] ? 'x' : 'y', from, to, endIds, OUTWARD[side]),
+            ) ?? order[0];
         }
       }
 
@@ -1551,11 +1571,13 @@ export class AvoidRouter {
     from: dia.Point,
     to: dia.Point,
     ends: (dia.Cell.ID | undefined)[],
+    outward?: dia.Point,
   ): boolean {
-    // Two nodes in the same column have no sideways heading at all, and two
-    // in the same row none downwards. A gutter on either side then serves
-    // equally well, and the dock side settles which one is used.
-    const heading = Math.sign(to[across] - from[across]);
+    // Which way the link leaves decides which gutters are even on the way.
+    // Normally that is simply where the target lies, but two nodes in the
+    // same column give no answer at all — there the dock being considered is
+    // the one that knows, so it is asked.
+    const heading = outward?.[across] || Math.sign(to[across] - from[across]);
 
     return this.gutters(across, from[across]).some((at) => {
       if (heading !== 0 && (at - from[across]) * heading <= 0) return false;
