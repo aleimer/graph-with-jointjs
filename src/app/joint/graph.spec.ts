@@ -2,7 +2,9 @@ import { dia } from '@joint/core';
 import Graph from './graph';
 import { FieldNode, GroupNode } from './nodes';
 import { FlowLink } from './edges';
+import { filter } from 'rxjs';
 import { write } from './cell-state';
+import { isChanged } from './events';
 import { matches } from './selector';
 import type { ElementDefinition } from './types';
 
@@ -451,15 +453,19 @@ describe('Graph facade', () => {
 
   it('restyles once for a batch, not once per cell', async () => {
     graph.render();
-    let passes = 0;
-    const original = graph.model.getLinks;
-    // `applyWeights` is the only pass that asks the model for links, so this
-    // counts restyles without reaching into the facade's privates.
     graph.setConfig({ edges: { weight: { field: 'litres' } } });
-    graph.model.getLinks = function (this: dia.Graph, ...args: []) {
+
+    // Counted at the source. Every indirect proxy for "a restyle happened"
+    // also catches something else: the model is asked for its links by the
+    // change announcement too, and for its cells by JointJS itself while
+    // cells are being added.
+    const inner = graph as unknown as { updateStyles(): void };
+    const original = inner.updateStyles.bind(graph);
+    let passes = 0;
+    inner.updateStyles = () => {
       passes++;
-      return original.apply(this, args);
-    } as typeof graph.model.getLinks;
+      original();
+    };
 
     graph.addElements([
       { data: { id: 'n1' } },
@@ -470,8 +476,58 @@ describe('Graph facade', () => {
     ]);
     await Promise.resolve();
 
-    graph.model.getLinks = original;
     expect(passes).toBe(1);
+  });
+
+  it('delivers pointer events to handlers that asked for them', () => {
+    const seen: string[] = [];
+    graph.addEvent({ events: 'tap', selector: 'node', handler: (e) => seen.push(`node:${e.cell?.id}`) });
+    graph.addEvent({ events: 'tap', handler: (e) => seen.push(`any:${e.cell?.id ?? 'blank'}`) });
+    graph.addEvent({ events: 'dbltap', handler: () => seen.push('dbl') });
+
+    const tap = (cell: dia.Cell | null) =>
+      graph.events$.next({
+        kind: 'pointer',
+        type: 'tap',
+        cell,
+        view: null,
+        paper: null as unknown as dia.Paper,
+        originalEvent: null,
+        position: { x: 0, y: 0 },
+      });
+
+    tap(graph.model.getCell('store'));
+    tap(linkById('e1'));
+    tap(null);
+
+    // A selector asks about cells, so the blank tap reaches only the handler
+    // that did not give one, and the edge reaches neither `node` nor `dbltap`.
+    expect(seen).toEqual(['node:store', 'any:store', 'any:e1', 'any:blank']);
+  });
+
+  it('coalesces model changes into one announcement', async () => {
+    const counts: number[] = [];
+    graph.events$.pipe(filter(isChanged)).subscribe((e) => counts.push(e.nodes));
+
+    graph.addElements([
+      { data: { id: 'c1' } },
+      { data: { id: 'c2' } },
+      { data: { id: 'c3' } },
+    ]);
+    await Promise.resolve();
+
+    // Four seeded nodes, the group addParents() made for them, and three
+    // more — announced once rather than once per cell.
+    expect(counts).toEqual([8]);
+  });
+
+  it('ends its stream on destroy so subscribers do not outlive it', () => {
+    let completed = false;
+    graph.events$.subscribe({ complete: () => (completed = true) });
+
+    graph.destroy();
+
+    expect(completed).toBe(true);
   });
 
   it('round-trips the viewport', () => {

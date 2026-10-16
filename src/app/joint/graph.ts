@@ -1,8 +1,11 @@
 import { dia } from '@joint/core';
+import { Subject } from 'rxjs';
 import { AvoidRouter } from './avoid-router';
 import { classesOf, isCollapsed, read, write } from './cell-state';
 import { GROUP_PADDING, LINK_CLEARANCE, MINOR_GRID, NODE_CLEARANCE } from './constants';
 import { Groups } from './groups';
+import type { GraphEvent } from './events';
+import { PUBLISHED, jointNameFor } from './events';
 import { installInteraction } from './interaction';
 import { createPaper, drawGrid } from './paper';
 import { matcher, matches } from './selector';
@@ -64,6 +67,16 @@ export default class Graph {
   viewPort: ViewPort = { pan: { x: 0, y: 0 }, zoom: 1 };
 
   /**
+   * Everything the graph announces: pointer events on cells and blank paper,
+   * a coalesced notice that the model changed, and viewport moves.
+   *
+   * Subscribers are responsible for their own teardown — `takeUntilDestroyed()`
+   * in a component. `destroy()` completes the stream, so a subscription that
+   * outlives the graph ends rather than leaking.
+   */
+  readonly events$ = new Subject<GraphEvent>();
+
+  /**
    * The cells on the graph, as Cytoscape's `cy.nodes()` / `cy.edges()` would
    * give them — read from the model rather than kept in step with it.
    *
@@ -89,6 +102,8 @@ export default class Graph {
   private styleDirty = false;
   /** True while a flush is already queued for the end of this tick. */
   private flushQueued = false;
+  /** True while a `changed` notice is already queued for the end of this tick. */
+  private changeQueued = false;
   /** Spacing of the light mesh; the major lines sit every `MAJOR_GRID`. */
   private gridSpacing = MINOR_GRID;
   private grid: GridSize = DEFAULT_GRID;
@@ -109,6 +124,8 @@ export default class Graph {
   private readonly groups: Groups;
   /** Unbinds the pan/zoom/snap handlers; null for a model-only graph. */
   private uninstallInteraction: (() => void) | null = null;
+  /** Subscriptions the facade opened on its own stream, for `addEvent`. */
+  private readonly subscriptions: { unsubscribe(): void }[] = [];
 
   /**
    * Pass the element the diagram should render into. Omit it for a model-only
@@ -129,6 +146,10 @@ export default class Graph {
     // once per cell, so this marks and defers rather than restyling here —
     // 127 full restyles would be the cost of loading the demo graph.
     this.model.on('add', () => this.restyleSoon());
+    // One notice per tick, not one per cell. JointJS reports cells singly, so
+    // loading the demo graph would otherwise announce 128 separate changes to
+    // say the one thing a consumer needs to hear.
+    this.model.on('add remove change', () => this.announceChange());
 
 
     if (!container) {
@@ -143,6 +164,7 @@ export default class Graph {
       toPixels: (position) => this.toPixels(position),
       onViewPortChange: () => this.saveCurrentViewPort(),
     });
+    this.publishPointerEvents();
     this.renderGrid(true);
   }
 
@@ -185,40 +207,21 @@ export default class Graph {
    * A `selector` filters by cell; omit it to also receive blank-paper events.
    */
   addEvent({ events, selector, handler }: Event): this {
-    if (!this.paper) return this;
-    const paper = this.paper;
+    const wanted = new Set(events.split(/\s+/).filter(Boolean));
     const test = matcher(selector);
 
-    for (const name of events.split(/\s+/).filter(Boolean)) {
-      const jointName = EVENT_ALIASES[name] ?? name;
-
-      paper.on(
-        `cell:${jointName}`,
-        (view: dia.CellView, evt: dia.Event, x: number, y: number) => {
-          if (!test(view.model)) return;
-          handler({
-            type: name,
-            cell: view.model,
-            view,
-            paper,
-            originalEvent: evt,
-            position: { x, y },
-          });
-        },
-      );
-
-      if (selector) continue;
-      paper.on(`blank:${jointName}`, (evt: dia.Event, x: number, y: number) => {
-        handler({
-          type: name,
-          cell: null,
-          view: null,
-          paper,
-          originalEvent: evt,
-          position: { x, y },
-        });
-      });
-    }
+    // Kept for the Cytoscape-shaped call sites, but it is now a filter over
+    // `events$` rather than its own binding. The subscription is held so
+    // `destroy()` can end it: the original had no way to unsubscribe at all.
+    this.subscriptions.push(
+      this.events$.subscribe((event) => {
+        if (event.kind !== 'pointer' || !wanted.has(event.type)) return;
+        // A selector asks about cells, so blank paper only reaches a handler
+        // that did not ask for one.
+        if (event.cell ? !test(event.cell) : Boolean(selector)) return;
+        handler(event);
+      }),
+    );
 
     return this;
   }
@@ -240,6 +243,12 @@ export default class Graph {
   }
 
   destroy(): this {
+    for (const subscription of this.subscriptions) subscription.unsubscribe();
+    this.subscriptions.length = 0;
+    // Completing ends every outside subscription too, so one that outlives
+    // the graph stops rather than waiting on a stream nothing will feed.
+    this.events$.complete();
+
     this.avoidRouter?.destroy();
     this.avoidRouter = null;
     this.uninstallInteraction?.();
@@ -332,6 +341,7 @@ export default class Graph {
     if (!this.paper) return this;
     const { tx, ty } = this.paper.translate();
     this.viewPort = { pan: { x: tx, y: ty }, zoom: this.paper.scale().sx };
+    this.events$.next({ kind: 'viewport', viewPort: this.viewPort });
     return this;
   }
 
@@ -339,6 +349,7 @@ export default class Graph {
     this.viewPort = viewPort;
     this.paper?.scale(viewPort.zoom);
     this.paper?.translate(viewPort.pan.x, viewPort.pan.y);
+    this.events$.next({ kind: 'viewport', viewPort });
     return this;
   }
 
@@ -527,6 +538,62 @@ export default class Graph {
   }
 
   /**
+   * Binds the paper events the bus carries, once.
+   *
+   * A fixed set rather than one binding per `addEvent` call: a stream has to
+   * carry what happens whether or not anyone has subscribed yet, or the first
+   * subscriber changes what the second one sees.
+   */
+  private publishPointerEvents(): void {
+    const paper = this.paper;
+    if (!paper) return;
+
+    for (const name of PUBLISHED) {
+      const jointName = jointNameFor(name);
+
+      paper.on(
+        `cell:${jointName}`,
+        (view: dia.CellView, evt: dia.Event, x: number, y: number) => {
+          this.events$.next({
+            kind: 'pointer',
+            type: name,
+            cell: view.model,
+            view,
+            paper,
+            originalEvent: evt,
+            position: { x, y },
+          });
+        },
+      );
+
+      paper.on(`blank:${jointName}`, (evt: dia.Event, x: number, y: number) => {
+        this.events$.next({
+          kind: 'pointer',
+          type: name,
+          cell: null,
+          view: null,
+          paper,
+          originalEvent: evt,
+          position: { x, y },
+        });
+      });
+    }
+  }
+
+  /** Announces that the model changed, once for this tick. */
+  private announceChange(): void {
+    if (this.changeQueued) return;
+    this.changeQueued = true;
+
+    queueMicrotask(() => {
+      this.changeQueued = false;
+      if (this.events$.closed) return;
+      const { nodes, edges } = this.data;
+      this.events$.next({ kind: 'changed', nodes: nodes.length, links: edges.length });
+    });
+  }
+
+  /**
    * Marks the styles stale and applies them, if there is anything to apply
    * them to yet.
    *
@@ -646,22 +713,6 @@ export default class Graph {
   }
 
 }
-
-/** Cytoscape event names mapped onto their JointJS paper equivalents. */
-const EVENT_ALIASES: Record<string, string> = {
-  tap: 'pointerclick',
-  click: 'pointerclick',
-  dbltap: 'pointerdblclick',
-  dblclick: 'pointerdblclick',
-  cxttap: 'contextmenu',
-  mouseover: 'mouseenter',
-  mouseout: 'mouseleave',
-  mousedown: 'pointerdown',
-  mouseup: 'pointerup',
-  grab: 'pointerdown',
-  drag: 'pointermove',
-  free: 'pointerup',
-};
 
 export type {
   Config,

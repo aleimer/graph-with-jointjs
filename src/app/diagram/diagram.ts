@@ -1,15 +1,20 @@
 import {
   AfterViewInit,
   Component,
+  DestroyRef,
   ElementRef,
+  inject,
   OnDestroy,
   computed,
   signal,
   viewChild,
 } from '@angular/core';
+import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { dia, elementTools, highlighters, linkTools } from '@joint/core';
+import { filter } from 'rxjs';
 import { AvoidRouter } from '../joint/avoid-router';
 import { dataOf, isCollapsed } from '../joint/cell-state';
+import { isChanged, isPointer, isViewPort } from '../joint/events';
 import { ZOOM_MAX, ZOOM_MIN } from '../joint/constants';
 import Graph from '../joint/graph';
 import { GroupNode } from '../joint/nodes';
@@ -40,6 +45,8 @@ const STYLES: StylesheetStyle[] = [
 })
 export class Diagram implements AfterViewInit, OnDestroy {
   private readonly canvas = viewChild.required<ElementRef<HTMLDivElement>>('canvas');
+  /** Ends the graph subscriptions with the component. */
+  private readonly destroyRef = inject(DestroyRef);
 
   // JointJS lives outside Angular's world, so every piece of state the template
   // needs is mirrored into a signal from the graph/paper event handlers.
@@ -104,8 +111,7 @@ export class Diagram implements AfterViewInit, OnDestroy {
     this.weightLabel = label === false ? undefined : label;
     this.valuesVisible.set(Boolean(label));
 
-    this.graph.model.on('add remove change', () => this.sync());
-    this.bindHoverTools();
+    this.bindGraphEvents();
     this.sync();
   }
 
@@ -114,34 +120,32 @@ export class Diagram implements AfterViewInit, OnDestroy {
   }
 
   /**
-   * Hover tools use the paper directly — the facade deliberately exposes
-   * `paper`/`model` for everything it doesn't wrap.
+   * Everything the component listens to, on one stream.
+   *
+   * `takeUntilDestroyed` ends these with the component; the graph completing
+   * on `destroy()` would end them too, and either is enough.
    */
-  private bindHoverTools(): void {
-    const { paper } = this.graph;
-    if (!paper) return;
+  private bindGraphEvents(): void {
+    const events = this.graph.events$.pipe(takeUntilDestroyed(this.destroyRef));
 
-    paper.on('element:mouseenter', (view: dia.ElementView) => {
-      view.addTools(
-        new dia.ToolsView({
-          tools: [
-            new elementTools.Boundary({ padding: 6 }),
-            // Nodes have no ports, so this is how a link gets drawn: drag the
-            // button on the right edge onto another node.
-            new elementTools.Connect({
-              x: '100%',
-              y: '50%',
-              offset: { x: 10, y: 0 },
-              magnet: 'body',
-            }),
-            new elementTools.Remove({ x: '100%', y: 0, offset: { x: 2, y: -2 } }),
-          ],
-        }),
-      );
+    // Coalesced: one notice per tick however many cells moved.
+    events.pipe(filter(isChanged)).subscribe(({ nodes, links }) => {
+      this.nodeCount.set(nodes);
+      this.linkCount.set(links);
+      this.syncSelection();
     });
-    paper.on('element:mouseleave', (view: dia.ElementView) => view.removeTools());
 
-    paper.on('link:mouseenter', (view: dia.LinkView) => {
+    events.pipe(filter(isViewPort)).subscribe(({ viewPort }) => this.zoom.set(viewPort.zoom));
+
+    events.pipe(filter(isPointer)).subscribe((event) => {
+      if (event.type === 'mouseover') this.addHoverTools(event.view);
+      if (event.type === 'mouseout') event.view?.removeTools();
+    });
+  }
+
+  /** The tools shown while the pointer is over a cell. */
+  private addHoverTools(view: dia.CellView | null): void {
+    if (view instanceof dia.LinkView) {
       view.addTools(
         new dia.ToolsView({
           tools: [
@@ -152,16 +156,38 @@ export class Diagram implements AfterViewInit, OnDestroy {
           ],
         }),
       );
-    });
-    paper.on('link:mouseleave', (view: dia.LinkView) => view.removeTools());
+      return;
+    }
+    if (!(view instanceof dia.ElementView)) return;
+
+    view.addTools(
+      new dia.ToolsView({
+        tools: [
+          new elementTools.Boundary({ padding: 6 }),
+          // Nodes have no ports, so this is how a link gets drawn: drag the
+          // button on the right edge onto another node.
+          new elementTools.Connect({
+            x: '100%',
+            y: '50%',
+            offset: { x: 10, y: 0 },
+            magnet: 'body',
+          }),
+          new elementTools.Remove({ x: '100%', y: 0, offset: { x: 2, y: -2 } }),
+        ],
+      }),
+    );
   }
 
+  /** Reads the whole state across, for the first paint and after a reload. */
   private sync(): void {
     const { nodes, edges } = this.graph.data;
     this.nodeCount.set(nodes.length);
     this.linkCount.set(edges.length);
     this.zoom.set(this.graph.viewPort.zoom);
+    this.syncSelection();
+  }
 
+  private syncSelection(): void {
     // The selection may have been collapsed or removed out from under us.
     if (this.selected && !this.graph.model.getCell(this.selected.id)) {
       this.select(null);
