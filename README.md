@@ -441,7 +441,7 @@ const graph = new Graph(container)
 | --- | --- |
 | [joint/graph.ts](src/app/joint/graph.ts) | The facade — paper setup, elements, parents, collapse/expand, edge redirection, styles, viewport |
 | [joint/types.ts](src/app/joint/types.ts) | `Config`, `Event`, `ElementDefinition`, `StylesheetStyle`, … |
-| [joint/events.ts](src/app/joint/events.ts) | The `GraphEvent` union carried by `graph.events$` — pointer, coalesced change, viewport |
+| [joint/events.ts](src/app/joint/events.ts) | `EventBus` and the typed `GraphEvents` map behind `graph.eventbus` — what the graph announces, and what can be asked of it |
 | [joint/groups.ts](src/app/joint/groups.ts) | Collapse/expand: the stash, edge redirection and co-directed bundling |
 | [joint/styling.ts](src/app/joint/styling.ts) | Stylesheets, the weight scale and the filter — in the order their precedence depends on |
 | [joint/paper.ts](src/app/joint/paper.ts) | The `dia.Paper` setup: what may be embedded, which connections are legal, the grid layer |

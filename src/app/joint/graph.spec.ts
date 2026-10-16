@@ -2,9 +2,7 @@ import { dia } from '@joint/core';
 import Graph from './graph';
 import { FieldNode, GroupNode } from './nodes';
 import { FlowLink } from './edges';
-import { filter } from 'rxjs';
 import { write } from './cell-state';
-import { isChanged } from './events';
 import { matches } from './selector';
 import type { ElementDefinition } from './types';
 
@@ -486,8 +484,7 @@ describe('Graph facade', () => {
     graph.addEvent({ events: 'dbltap', handler: () => seen.push('dbl') });
 
     const tap = (cell: dia.Cell | null) =>
-      graph.events$.next({
-        kind: 'pointer',
+      graph.eventbus.emit('cell:tap', {
         type: 'tap',
         cell,
         view: null,
@@ -507,7 +504,7 @@ describe('Graph facade', () => {
 
   it('coalesces model changes into one announcement', async () => {
     const counts: number[] = [];
-    graph.events$.pipe(filter(isChanged)).subscribe((e) => counts.push(e.nodes));
+    graph.eventbus.on('graph:changed').subscribe((e) => counts.push(e.nodes));
 
     graph.addElements([
       { data: { id: 'c1' } },
@@ -523,7 +520,7 @@ describe('Graph facade', () => {
 
   it('ends its stream on destroy so subscribers do not outlive it', () => {
     let completed = false;
-    graph.events$.subscribe({ complete: () => (completed = true) });
+    graph.eventbus.all$.subscribe({ complete: () => (completed = true) });
 
     graph.destroy();
 

@@ -1,11 +1,16 @@
 import { dia } from '@joint/core';
-import { Subject } from 'rxjs';
 import { AvoidRouter } from './avoid-router';
 import { classesOf, isCollapsed, read, write } from './cell-state';
-import { GROUP_PADDING, LINK_CLEARANCE, MINOR_GRID, NODE_CLEARANCE } from './constants';
+import {
+  GROUP_PADDING,
+  LINK_CLEARANCE,
+  MINOR_GRID,
+  NODE_CLEARANCE,
+  ZOOM_MAX,
+  ZOOM_MIN,
+} from './constants';
 import { Groups } from './groups';
-import type { GraphEvent } from './events';
-import { PUBLISHED, jointNameFor } from './events';
+import { EventBus, POINTER_EVENTS, jointNameFor, pointerEventName } from './events';
 import { installInteraction } from './interaction';
 import { createPaper, drawGrid } from './paper';
 import { matcher, matches } from './selector';
@@ -67,14 +72,19 @@ export default class Graph {
   viewPort: ViewPort = { pan: { x: 0, y: 0 }, zoom: 1 };
 
   /**
-   * Everything the graph announces: pointer events on cells and blank paper,
-   * a coalesced notice that the model changed, and viewport moves.
+   * Where the DOM, JointJS and Angular meet.
    *
-   * Subscribers are responsible for their own teardown — `takeUntilDestroyed()`
-   * in a component. `destroy()` completes the stream, so a subscription that
-   * outlives the graph ends rather than leaking.
+   * The graph announces on it — pointer events, a coalesced notice that the
+   * model changed, viewport moves — and takes requests on it, which it
+   * answers by calling the method that already does the work. The methods
+   * stay public, so a programmatic caller keeps the chaining and the return
+   * values.
+   *
+   * Subscribers handle their own teardown (`takeUntilDestroyed()` in a
+   * component). `destroy()` ends the bus, so one that outlives the graph
+   * completes rather than waiting.
    */
-  readonly events$ = new Subject<GraphEvent>();
+  readonly eventbus = new EventBus();
 
   /**
    * The cells on the graph, as Cytoscape's `cy.nodes()` / `cy.edges()` would
@@ -165,6 +175,7 @@ export default class Graph {
       onViewPortChange: () => this.saveCurrentViewPort(),
     });
     this.publishPointerEvents();
+    this.answerCommands();
     this.renderGrid(true);
   }
 
@@ -213,13 +224,15 @@ export default class Graph {
     // Kept for the Cytoscape-shaped call sites, but it is now a filter over
     // `events$` rather than its own binding. The subscription is held so
     // `destroy()` can end it: the original had no way to unsubscribe at all.
+    const names = POINTER_EVENTS.filter((name) => wanted.has(name)).map(pointerEventName);
+    if (!names.length) return this;
+
     this.subscriptions.push(
-      this.events$.subscribe((event) => {
-        if (event.kind !== 'pointer' || !wanted.has(event.type)) return;
+      this.eventbus.onAny(...names).subscribe(({ payload }) => {
         // A selector asks about cells, so blank paper only reaches a handler
         // that did not ask for one.
-        if (event.cell ? !test(event.cell) : Boolean(selector)) return;
-        handler(event);
+        if (payload.cell ? !test(payload.cell) : Boolean(selector)) return;
+        handler(payload);
       }),
     );
 
@@ -245,9 +258,10 @@ export default class Graph {
   destroy(): this {
     for (const subscription of this.subscriptions) subscription.unsubscribe();
     this.subscriptions.length = 0;
-    // Completing ends every outside subscription too, so one that outlives
-    // the graph stops rather than waiting on a stream nothing will feed.
-    this.events$.complete();
+    // Ending the bus ends every outside subscription too, so one that
+    // outlives the graph stops rather than waiting on a stream nothing will
+    // feed again.
+    this.eventbus.destroy();
 
     this.avoidRouter?.destroy();
     this.avoidRouter = null;
@@ -341,7 +355,7 @@ export default class Graph {
     if (!this.paper) return this;
     const { tx, ty } = this.paper.translate();
     this.viewPort = { pan: { x: tx, y: ty }, zoom: this.paper.scale().sx };
-    this.events$.next({ kind: 'viewport', viewPort: this.viewPort });
+    this.eventbus.emit('viewport:moved', { viewPort: this.viewPort });
     return this;
   }
 
@@ -349,7 +363,7 @@ export default class Graph {
     this.viewPort = viewPort;
     this.paper?.scale(viewPort.zoom);
     this.paper?.translate(viewPort.pan.x, viewPort.pan.y);
-    this.events$.next({ kind: 'viewport', viewPort });
+    this.eventbus.emit('viewport:moved', { viewPort });
     return this;
   }
 
@@ -548,14 +562,14 @@ export default class Graph {
     const paper = this.paper;
     if (!paper) return;
 
-    for (const name of PUBLISHED) {
+    for (const name of POINTER_EVENTS) {
       const jointName = jointNameFor(name);
+      const on = pointerEventName(name);
 
       paper.on(
         `cell:${jointName}`,
         (view: dia.CellView, evt: dia.Event, x: number, y: number) => {
-          this.events$.next({
-            kind: 'pointer',
+          this.eventbus.emit(on, {
             type: name,
             cell: view.model,
             view,
@@ -567,8 +581,7 @@ export default class Graph {
       );
 
       paper.on(`blank:${jointName}`, (evt: dia.Event, x: number, y: number) => {
-        this.events$.next({
-          kind: 'pointer',
+        this.eventbus.emit(on, {
           type: name,
           cell: null,
           view: null,
@@ -580,6 +593,39 @@ export default class Graph {
     }
   }
 
+  /**
+   * Answers the requests made on the bus.
+   *
+   * Each one calls the public method that already does the work, so there is
+   * one implementation and the bus is a way in rather than a second API. A
+   * command the facade cannot serve alone — adding a node needs an id, and
+   * collapsing needs to know what is selected — is not here: the caller that
+   * has that context is the one that must assemble it.
+   */
+  private answerCommands(): void {
+    const bus = this.eventbus;
+
+    this.subscriptions.push(
+      bus.on('viewport:zoom').subscribe(({ by, to }) => {
+        const { pan, zoom } = this.viewPort;
+        const next = to ?? zoom + (by ?? 0);
+        this.setViewPort({ pan, zoom: Math.min(ZOOM_MAX, Math.max(ZOOM_MIN, next)) });
+      }),
+      bus.on('viewport:set').subscribe((viewPort) => this.setViewPort(viewPort)),
+      bus.on('viewport:fit').subscribe(() => this.fit()),
+      bus.on('grid:show').subscribe(({ visible }) => this.renderGrid(visible)),
+      bus.on('filter:set').subscribe(({ filter }) => this.setConfig({ filter })),
+      bus.on('config:set').subscribe((config) => this.setConfig(config)),
+      bus.on('node:move').subscribe(({ id, position }) => this.setNodePosition(id, position)),
+      bus.on('cells:remove').subscribe(({ selector }) => this.remove(selector)),
+      bus.on('layout:arrange').subscribe(() => {
+        // Dropping the saved positions makes setPosition() lay everything out.
+        this.setConfig({ positions: {} }).setPosition();
+        this.fit();
+      }),
+    );
+  }
+
   /** Announces that the model changed, once for this tick. */
   private announceChange(): void {
     if (this.changeQueued) return;
@@ -587,9 +633,8 @@ export default class Graph {
 
     queueMicrotask(() => {
       this.changeQueued = false;
-      if (this.events$.closed) return;
       const { nodes, edges } = this.data;
-      this.events$.next({ kind: 'changed', nodes: nodes.length, links: edges.length });
+      this.eventbus.emit('graph:changed', { nodes: nodes.length, links: edges.length });
     });
   }
 

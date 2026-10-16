@@ -11,11 +11,9 @@ import {
 } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { dia, elementTools, highlighters, linkTools } from '@joint/core';
-import { filter } from 'rxjs';
 import { AvoidRouter } from '../joint/avoid-router';
 import { dataOf, isCollapsed } from '../joint/cell-state';
-import { isChanged, isPointer, isViewPort } from '../joint/events';
-import { ZOOM_MAX, ZOOM_MIN } from '../joint/constants';
+
 import Graph from '../joint/graph';
 import { GroupNode } from '../joint/nodes';
 import type {
@@ -126,21 +124,33 @@ export class Diagram implements AfterViewInit, OnDestroy {
    * on `destroy()` would end them too, and either is enough.
    */
   private bindGraphEvents(): void {
-    const events = this.graph.events$.pipe(takeUntilDestroyed(this.destroyRef));
+    const bus = this.graph.eventbus;
+    const ref = this.destroyRef;
 
     // Coalesced: one notice per tick however many cells moved.
-    events.pipe(filter(isChanged)).subscribe(({ nodes, links }) => {
-      this.nodeCount.set(nodes);
-      this.linkCount.set(links);
-      this.syncSelection();
-    });
+    bus
+      .on('graph:changed')
+      .pipe(takeUntilDestroyed(ref))
+      .subscribe(({ nodes, links }) => {
+        this.nodeCount.set(nodes);
+        this.linkCount.set(links);
+        this.syncSelection();
+      });
 
-    events.pipe(filter(isViewPort)).subscribe(({ viewPort }) => this.zoom.set(viewPort.zoom));
+    bus
+      .on('viewport:moved')
+      .pipe(takeUntilDestroyed(ref))
+      .subscribe(({ viewPort }) => this.zoom.set(viewPort.zoom));
 
-    events.pipe(filter(isPointer)).subscribe((event) => {
-      if (event.type === 'mouseover') this.addHoverTools(event.view);
-      if (event.type === 'mouseout') event.view?.removeTools();
-    });
+    bus
+      .on('cell:mouseover')
+      .pipe(takeUntilDestroyed(ref))
+      .subscribe(({ view }) => this.addHoverTools(view));
+
+    bus
+      .on('cell:mouseout')
+      .pipe(takeUntilDestroyed(ref))
+      .subscribe(({ view }) => view?.removeTools());
   }
 
   /** The tools shown while the pointer is over a cell. */
@@ -283,7 +293,7 @@ export class Diagram implements AfterViewInit, OnDestroy {
 
   toggleGrid(): void {
     this.gridVisible.update((visible) => !visible);
-    this.graph.renderGrid(this.gridVisible());
+    this.graph.eventbus.emit('grid:show', { visible: this.gridVisible() });
   }
 
   /** Turns the per-edge weight labels on and off. */
@@ -305,9 +315,7 @@ export class Diagram implements AfterViewInit, OnDestroy {
   }
 
   arrange(): void {
-    // Dropping the saved positions makes setPosition() lay everything out.
-    this.graph.setConfig({ positions: {} }).setPosition();
-    this.fit();
+    this.graph.eventbus.emit('layout:arrange');
   }
 
   fit(): void {
@@ -316,14 +324,12 @@ export class Diagram implements AfterViewInit, OnDestroy {
   }
 
   zoomBy(step: number): void {
-    const { zoom, pan } = this.graph.viewPort;
-    this.graph.setViewPort({ pan, zoom: Math.min(ZOOM_MAX, Math.max(ZOOM_MIN, zoom + step)) });
-    this.sync();
+    // The clamp lives with the graph now; the toolbar only says how far.
+    this.graph.eventbus.emit('viewport:zoom', { by: step });
   }
 
   resetZoom(): void {
-    this.graph.setViewPort({ pan: { x: 0, y: 0 }, zoom: 1 });
-    this.sync();
+    this.graph.eventbus.emit('viewport:set', { pan: { x: 0, y: 0 }, zoom: 1 });
   }
 
   clear(): void {

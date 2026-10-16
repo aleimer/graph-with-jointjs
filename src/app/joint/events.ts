@@ -1,49 +1,130 @@
 import { dia } from '@joint/core';
-import type { EventObject, ViewPort } from './types';
+import { Observable, Subject, filter, map } from 'rxjs';
+import type { Config, EventObject, GridPosition, ViewPort } from './types';
 
 /**
- * Everything the graph announces, on one stream.
+ * The events the graph carries, and what each one says.
  *
- * Three things used to carry this traffic and none of them agreed: the
- * facade's own `addEvent`, raw `model.on` for changes, and raw `paper.on` for
- * hover tooling. Two of those reach past the facade into JointJS, so a
- * consumer had to know which layer owned which event — and `addEvent` had no
- * way to unsubscribe at all.
- *
- * The union is discriminated on `kind` so a subscriber narrows by filtering,
- * and `type` keeps the Cytoscape-shaped name the facade was bound with
- * (`tap`, `mouseover`) rather than the JointJS one underneath.
+ * Two directions share one map. Names beginning `cell:`, `graph:` and
+ * `viewport:` are the graph announcing what happened; the rest are asked of
+ * it, and the facade answers them by calling the method that already does
+ * the work. The methods stay public, so a programmatic caller keeps the
+ * chaining and the return values; the bus is how the UI reaches them without
+ * holding the graph's API in its hands.
  */
-export type GraphEvent = PointerEvent | ChangedEvent | ViewPortEvent;
+export interface GraphEvents {
+  // --- announced by the graph ------------------------------------------------
+  'cell:tap': PointerEvent;
+  'cell:dbltap': PointerEvent;
+  'cell:cxttap': PointerEvent;
+  'cell:mouseover': PointerEvent;
+  'cell:mouseout': PointerEvent;
+  'cell:mousedown': PointerEvent;
+  'cell:mouseup': PointerEvent;
+
+  /**
+   * The graph gained, lost or altered cells.
+   *
+   * Coalesced to one per tick. JointJS reports cells one at a time, so
+   * loading the demo graph would otherwise announce 128 separate additions to
+   * say the one thing a consumer needs to hear.
+   */
+  'graph:changed': ChangedEvent;
+
+  /** The paper was panned or zoomed, however it was asked for. */
+  'viewport:moved': ViewPortEvent;
+
+  // --- asked of the graph ----------------------------------------------------
+  'viewport:zoom': { by?: number; to?: number };
+  'viewport:fit': void;
+  'viewport:set': ViewPort;
+  'grid:show': { visible: boolean };
+  'filter:set': { filter: Config['filter'] };
+  'config:set': Config;
+  'node:move': { id: string; position: GridPosition };
+  'cells:remove': { selector: string };
+  'layout:arrange': void;
+}
 
 /** A pointer event on a cell, or on blank paper when `cell` is null. */
 export interface PointerEvent extends EventObject {
-  kind: 'pointer';
+  cell: dia.Cell | null;
+  view: dia.CellView | null;
 }
 
-/**
- * The graph gained, lost or altered cells.
- *
- * Coalesced to one per tick. JointJS reports cells one at a time, so loading
- * the demo graph announces 128 separate additions; what a consumer wants to
- * know is that the graph is now different, once.
- */
 export interface ChangedEvent {
-  kind: 'changed';
   nodes: number;
   links: number;
 }
 
-/** The paper was panned or zoomed. */
 export interface ViewPortEvent {
-  kind: 'viewport';
   viewPort: ViewPort;
 }
 
-/** Narrowing helpers, so subscribers filter without writing predicates. */
-export const isPointer = (event: GraphEvent): event is PointerEvent => event.kind === 'pointer';
-export const isChanged = (event: GraphEvent): event is ChangedEvent => event.kind === 'changed';
-export const isViewPort = (event: GraphEvent): event is ViewPortEvent => event.kind === 'viewport';
+/** One emission, as it travels. */
+interface Envelope {
+  name: keyof GraphEvents;
+  payload: unknown;
+}
+
+/**
+ * The graph's event bus.
+ *
+ * Owned by the facade and reached as `graph.eventbus`, so there is one place
+ * the DOM, JointJS and Angular meet rather than three that disagree. It is
+ * deliberately thin: a typed `emit`, a typed `on`, and a stream of everything
+ * for a consumer that wants to watch the lot.
+ */
+export class EventBus {
+  private readonly stream = new Subject<Envelope>();
+
+  /** Every emission, in order. For logging, devtools, or a catch-all. */
+  readonly all$: Observable<Envelope> = this.stream.asObservable();
+
+  /**
+   * Announces an event, or asks for a command.
+   *
+   * The payload is optional exactly when the event declares none, so
+   * `emit('viewport:fit')` is as valid as `emit('grid:show', { visible })`.
+   */
+  emit<K extends keyof GraphEvents>(
+    name: K,
+    ...payload: GraphEvents[K] extends void ? [] : [GraphEvents[K]]
+  ): void {
+    if (this.stream.closed) return;
+    this.stream.next({ name, payload: payload[0] });
+  }
+
+  /** One event's stream, typed by its name. */
+  on<K extends keyof GraphEvents>(name: K): Observable<GraphEvents[K]> {
+    return this.stream.pipe(
+      filter((envelope) => envelope.name === name),
+      map((envelope) => envelope.payload as GraphEvents[K]),
+    );
+  }
+
+  /**
+   * Several events at once, for a consumer that treats them alike — the
+   * pointer events being the case that asks for it.
+   */
+  onAny<K extends keyof GraphEvents>(
+    ...names: K[]
+  ): Observable<{ name: K; payload: GraphEvents[K] }> {
+    const wanted = new Set<keyof GraphEvents>(names);
+    return this.stream.pipe(
+      filter((envelope) => wanted.has(envelope.name)),
+      map((envelope) => ({ name: envelope.name as K, payload: envelope.payload as GraphEvents[K] })),
+    );
+  }
+
+  /**
+   * Ends the bus. Subscribers complete rather than waiting on a stream
+   * nothing will feed again.
+   */
+  destroy(): void {
+    this.stream.complete();
+  }
+}
 
 /** Cytoscape event names mapped onto their JointJS paper equivalents. */
 export const EVENT_ALIASES: Record<string, string> = {
@@ -62,17 +143,17 @@ export const EVENT_ALIASES: Record<string, string> = {
 };
 
 /**
- * The paper events published on the bus, as Cytoscape-shaped names.
+ * The pointer events the bus carries, as Cytoscape-shaped names.
  *
  * A fixed set, bound once, rather than bound lazily per `addEvent` call: a
- * stream nobody has subscribed to yet still has to carry what happens, or the
- * first subscriber would miss everything until a second one asked for it.
+ * stream has to carry what happens whether or not anyone has subscribed yet,
+ * or the first subscriber changes what the second one sees.
  *
  * `pointermove` is deliberately absent. It fires continuously while dragging
- * and nothing listens for it; a consumer that wants it can take `grab` and
- * read the paper directly.
+ * and nothing listens for it; a consumer that wants it can take `mousedown`
+ * and read the paper directly.
  */
-export const PUBLISHED: readonly string[] = [
+export const POINTER_EVENTS = [
   'tap',
   'dbltap',
   'cxttap',
@@ -80,7 +161,12 @@ export const PUBLISHED: readonly string[] = [
   'mouseout',
   'mousedown',
   'mouseup',
-];
+] as const;
+
+export type PointerEventName = (typeof POINTER_EVENTS)[number];
+
+/** `tap` → `cell:tap`, the name it travels under. */
+export const pointerEventName = (name: PointerEventName) => `cell:${name}` as const;
 
 /** The JointJS name a Cytoscape-shaped one is bound as. */
 export const jointNameFor = (name: string): string => EVENT_ALIASES[name] ?? name;
