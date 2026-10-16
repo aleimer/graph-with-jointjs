@@ -1033,19 +1033,39 @@ export class AvoidRouter {
     minPitch: number,
   ): number[] {
     const step = this.lane / 4;
+    const fullest = outline(0) || 1;
+
+    /** The quarter-lane positions whose dock still sits this far out. */
+    const slots = (reach: number) => {
+      const out: number[] = [];
+      for (let v = 0; v <= extent + 0.5; v += step) {
+        const lane = Math.min(v, extent);
+        if (outline(lane - extent / 2) >= fullest * reach) out.push(lane);
+      }
+      return out;
+    };
+
     // A lane is only usable where the outline still reaches most of the way
     // out. On a round node the outline falls away towards the ends of an
     // edge, so a lane out there docks high up the side: two links leaving the
     // bottom would appear to leave from the flanks, at different heights,
     // rather than from the bottom.
-    const fullest = outline(0) || 1;
-    const usable = (value: number) => outline(value - extent / 2) >= fullest * 0.78;
-
-    const available: number[] = [];
-    for (let v = 0; v <= extent + 0.5; v += step) {
-      const lane = Math.min(v, extent);
-      if (usable(lane)) available.push(lane);
+    //
+    // A crowded edge has to give somewhere, though, and it must not be the
+    // spacing: lanes closer than their links are wide draw two lines on top
+    // of each other, which is a failure, where a dock a little further round
+    // is a blemish. So the band is widened until it can hold the links at
+    // their proper pitch, and only a band that still cannot takes the
+    // narrower stride below.
+    const wanted = (count - 1) * Math.max(1, Math.ceil(minPitch / step)) + 1;
+    let available: number[] = [];
+    for (const reach of OUTLINE_REACH) {
+      const widened = slots(reach);
+      if (!widened.length) continue;
+      available = widened;
+      if (widened.length >= wanted) break;
     }
+
     if (!available.length) {
       return Array.from({ length: count }, (_, i) => (extent * (i + 1)) / (count + 1));
     }
@@ -1882,6 +1902,14 @@ const MAX_RECENTRE = 8;
  * bends, and moving it would only stretch its neighbours.
  */
 const MIN_CORRIDOR = 2;
+
+/**
+ * How far out a node's outline must still reach for a lane to dock there, as
+ * a fraction of its fullest. Tried in order: the first band wide enough to
+ * hold the edge's links at their proper spacing wins, so a quiet edge keeps
+ * its docks near the middle and only a crowded one spreads round the flanks.
+ */
+const OUTLINE_REACH = [0.78, 0.72, 0.66, 0.6];
 
 /** Lane offsets tried inside a gutter, middle first. */
 const CHANNEL_OFFSETS = [0, 1, -1, 2, -2];

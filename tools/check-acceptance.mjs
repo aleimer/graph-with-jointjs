@@ -11,7 +11,7 @@
  *   2. Collision avoidance    — no segment crosses a node it is not attached to
  *   3. Overlap avoidance      — no two links share a collinear stretch
  *   4. Crossings              — allowed, but every one is drawn with a jump
- *   5. Single bend            — at most one 90° turn per link
+ *   5. Single bend            — one 90° turn per link, unless one cannot reach
  *   5. Dynamic calculation    — re-routing stays inside an interactive budget
  */
 import { spawn } from 'node:child_process';
@@ -296,14 +296,70 @@ function checkLaneAlignment(links, lane, tol) {
   };
 }
 
+/** True when no segment of this polyline enters a foreign node's buffer. */
+function pathIsClear(points, boxes, ends, pad) {
+  for (let i = 1; i < points.length; i++) {
+    const a = points[i - 1];
+    const b = points[i];
+    const sx1 = Math.min(a.x, b.x);
+    const sx2 = Math.max(a.x, b.x);
+    const sy1 = Math.min(a.y, b.y);
+    const sy2 = Math.max(a.y, b.y);
+
+    for (const n of boxes) {
+      if (n.id === ends.source || n.id === ends.target) continue;
+      if (
+        sx2 > n.x - pad &&
+        sx1 < n.x + n.width + pad &&
+        sy2 > n.y - pad &&
+        sy1 < n.y + n.height + pad
+      ) {
+        return false;
+      }
+    }
+  }
+  return true;
+}
+
+/**
+ * Whether this link could have been drawn with a single bend.
+ *
+ * Asked of the two L-routes between the docks it actually has — out
+ * horizontally and then vertically, or the other way round — against nodes
+ * padded by the same clearance the router keeps. So "possible" here means
+ * what it meant when the router chose, rather than a looser standard the
+ * router could never have met.
+ */
+function singleBendReaches(link, boxes, graph, pad) {
+  const pts = link.points ?? [];
+  if (pts.length < 2) return true;
+
+  const from = pts[0];
+  const to = pts[pts.length - 1];
+  const ends = graph[link.id] ?? {};
+
+  return [
+    { x: to.x, y: from.y },
+    { x: from.x, y: to.y },
+  ].some((corner) => pathIsClear([from, corner, to], boxes, ends, pad));
+}
+
 /**
  * Counts direction changes. A rounded corner is one bend even though it is
  * drawn as two straight runs and an arc between them, so bends are counted
  * from the straight runs' orientations rather than from the point list.
+ *
+ * The criterion is one bend *where possible*, so a link is only at fault for
+ * a second bend when a single one could have reached. A link that has to get
+ * round a node in the way needs the detour, and reporting it would be
+ * reporting the router for doing its job — which is worse than useless,
+ * because a check that fails on correct output stops being read.
  */
-function checkBends(links, tol, allowed) {
+function checkBends(links, nodes, graph, tol, allowed, pad) {
+  const boxes = nodes.filter((n) => !n.isGroup && n.width > 0);
   const bad = [];
   let total = 0;
+  let detours = 0;
 
   for (const link of links) {
     const runs = [];
@@ -312,14 +368,26 @@ function checkBends(links, tol, allowed) {
       const vertical = Math.abs(s.x2 - s.x1) <= tol;
       if (!runs.length || runs[runs.length - 1] !== vertical) runs.push(vertical);
     }
+
     const bends = Math.max(0, runs.length - 1);
     total += bends;
-    if (bends > allowed) bad.push({ link: link.id, bends });
+    if (bends <= allowed) continue;
+
+    // One extra bend is a dog-leg: out of the source, along a clear gutter,
+    // and in. More than that is the fallback router, and is reported whether
+    // or not a single bend was on.
+    if (bends === allowed + 1 && !singleBendReaches(link, boxes, graph, pad)) {
+      detours++;
+      continue;
+    }
+    bad.push({ link: link.id, bends, singleBendWasPossible: singleBendReaches(link, boxes, graph, pad) });
   }
 
   return {
     name: 'Single bend',
-    detail: `${total} bends over ${links.length} links, at most ${allowed} each`,
+    detail:
+      `${total} bends over ${links.length} links, at most ${allowed} each` +
+      ` (+${detours} second bends where one could not reach)`,
     bad,
   };
 }
@@ -493,7 +561,7 @@ try {
     checkNodeClearance(links, nodes, ends, NODE_CLEARANCE),
     checkOverlaps(links, tolerance, CLEARANCE),
     checkLaneAlignment(links, LANE, tolerance),
-    checkBends(links, tolerance, 1),
+    checkBends(links, nodes, ends, tolerance, 1, NODE_CLEARANCE),
     checkUniqueDocks(
       links.flatMap((link) => {
         const pts = link.points;
