@@ -1,6 +1,12 @@
-name: Deploy demo
+name: CI
 
-# Publishes the playground to GitHub Pages on every push to main.
+# Builds and tests every push to a long-lived branch, and deploys only what
+# reaches main.
+#
+# Work happens on develop; main moves when a merge is asked for. So the gate
+# has to sit on develop too — testing only on main would mean finding out a
+# change is broken at the moment it goes live, which is the one moment it
+# cannot be allowed to be.
 #
 # The app is served from a subpath (/graph-with-jointjs/), not a domain root.
 # Its two runtime fetches — `graph.json` and `libavoid.wasm` — are relative, so
@@ -10,7 +16,9 @@ name: Deploy demo
 
 on:
   push:
-    branches: [main]
+    branches: [main, develop]
+  pull_request:
+    branches: [main, develop]
   workflow_dispatch:
 
 permissions:
@@ -18,20 +26,19 @@ permissions:
   pages: write
   id-token: write
 
-# One deploy at a time, and let a newer push supersede one still queued.
-# `cancel-in-progress` is deliberately false: cancelling mid-deploy can leave
-# Pages serving a half-written artifact.
+# One run per branch. `cancel-in-progress` is deliberately false: cancelling
+# mid-deploy can leave Pages serving a half-written artifact.
 concurrency:
-  group: pages
+  group: ci-${{ github.ref }}
   cancel-in-progress: false
 
 jobs:
   build:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v5
         with:
           node-version: 22
           cache: npm
@@ -47,12 +54,17 @@ jobs:
       - name: Build
         run: npx ng build --configuration production
 
+      # Only what is going live needs packaging.
       - uses: actions/upload-pages-artifact@v3
+        if: github.ref == 'refs/heads/main' && github.event_name == 'push'
         with:
           path: dist/graph-with-jointjs/browser
 
   deploy:
     needs: build
+    # Nothing but a push to main publishes. A pull request targeting main is
+    # built and tested like any other, but it does not deploy.
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
     runs-on: ubuntu-latest
     environment:
       name: github-pages
