@@ -598,6 +598,20 @@ describe('Graph facade', () => {
     expect(seen).toEqual(['edit', 'view']);
   });
 
+  it('keeps a group behind everything, even when JointJS raises it', () => {
+    // Dragging an element calls toFront({ deep: true }) so it can be dropped
+    // onto whatever it lands over. For a group that hides the nodes it
+    // contains, and it stays hidden after the drop.
+    const group = pipeline();
+    expect(group.get('z')).toBe(GroupNode.Z);
+
+    group.toFront({ deep: true });
+
+    expect(group.get('z')).toBe(GroupNode.Z);
+    // Its children were raised and may stay raised: they belong in front.
+    expect(graph.model.getCell('transform').get('z')).toBeGreaterThan(GroupNode.Z);
+  });
+
   it('round-trips the viewport', () => {
     graph.setViewPort({ pan: { x: 40, y: -20 }, zoom: 1.5 });
     graph.saveCurrentViewPort();

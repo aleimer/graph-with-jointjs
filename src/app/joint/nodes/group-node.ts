@@ -5,10 +5,16 @@ import { NODE_SIZE } from '../constants';
  * A compound node: other nodes are embedded in it, and collapsing swaps it to
  * `COLLAPSED_SIZE` while its children are stashed off-graph.
  *
- * `z: -1` keeps the box behind the nodes it contains.
+ * `Z` keeps the box behind the nodes it contains and the links between them.
  */
 export class GroupNode extends shapes.standard.Rectangle {
   static readonly COLLAPSED_SIZE = { width: NODE_SIZE, height: NODE_SIZE };
+
+  /**
+   * Below everything. A group is a backdrop, and nothing it contains should
+   * ever be behind it — the facade puts it back here if JointJS moves it.
+   */
+  static readonly Z = -1;
 
   /** Rectangular, so the full half-extent is available anywhere on an edge. */
   attachOffsetX(): number {
@@ -40,7 +46,7 @@ export class GroupNode extends shapes.standard.Rectangle {
           items: [],
         },
         size: { width: 420, height: 420 },
-        z: -1,
+        z: GroupNode.Z,
         attrs: {
           body: {
             rx: 10,

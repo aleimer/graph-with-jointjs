@@ -187,6 +187,17 @@ export default class Graph {
     // say the one thing a consumer needs to hear.
     this.model.on('add remove change', () => this.announceChange());
 
+    // Dragging an element puts it in front, so it can be dropped onto
+    // whatever it lands over. That is right for a node and wrong for a group,
+    // which is a backdrop: raising one hides the very nodes it contains, and
+    // it stays raised after the drop. Put straight back, so it never even
+    // flashes to the front mid-drag.
+    this.model.on('change:z', (cell: dia.Cell) => {
+      if (cell instanceof GroupNode && cell.get('z') !== GroupNode.Z) {
+        cell.set('z', GroupNode.Z);
+      }
+    });
+
     // The bus works without a paper: a request does not need something drawn
     // to answer it, and a model-only graph is the one unit tests use.
     this.answerCommands();
