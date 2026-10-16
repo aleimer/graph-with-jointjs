@@ -24,6 +24,7 @@ import type {
   Event,
   EventObject,
   GraphData,
+  GraphMode,
   GridPosition,
   GridSize,
   EdgeCollection,
@@ -40,6 +41,9 @@ const DEFAULT_GRID: GridSize = { cellWidth: 220, cellHeight: 130 };
 
 /** Highlighter id for the selection ring. */
 const SELECTION_ID = 'selection';
+
+/** Highlighter id for the edge under the pointer. */
+const HOVER_ID = 'hover';
 
 function isGridPosition(position: PositionInput): position is GridPosition {
   return 'col' in position;
@@ -114,6 +118,11 @@ export default class Graph {
     return this._config;
   }
 
+  /** What the diagram is for right now. Change it through `setConfig`. */
+  get mode(): GraphMode {
+    return this._config.mode ?? 'view';
+  }
+
   /** The selected cell, or null. Set it with `select()`. */
   get selected(): dia.Cell | null {
     return this.selectedCell;
@@ -178,6 +187,36 @@ export default class Graph {
     // say the one thing a consumer needs to hear.
     this.model.on('add remove change', () => this.announceChange());
 
+    // The bus works without a paper: a request does not need something drawn
+    // to answer it, and a model-only graph is the one unit tests use.
+    this.answerCommands();
+    // Tapping selects, as Cytoscape does; tapping blank paper clears.
+    this.subscriptions.push(
+      this.eventbus.on('cell:tap').subscribe(({ cell }) => {
+        // Reading a diagram, opening a group is the obvious thing a click on
+        // one means; there is nothing else to do with it. Editing, it has to
+        // be selectable instead, so the panels can act on it.
+        if (this.mode === 'view' && cell instanceof GroupNode) {
+          if (isCollapsed(cell)) this.expand([cell]);
+          else this.collapse([cell]);
+          return;
+        }
+        this.select(cell);
+      }),
+      // Hovering an edge picks it out of the bundle it runs in. Only while
+      // reading: editing puts its own tools on the cell under the pointer,
+      // and two things answering the same hover fight each other.
+      this.eventbus.on('cell:mouseover').subscribe(({ cell, view }) => {
+        if (this.mode !== 'view' || !cell?.isLink() || !view) return;
+        highlighters.stroke.add(view, { selector: 'line' }, HOVER_ID, {
+          attrs: { stroke: '#6366f1', 'stroke-width': 3, 'stroke-opacity': 0.9 },
+        });
+      }),
+      this.eventbus.on('cell:mouseout').subscribe(({ view }) => {
+        if (view) highlighters.stroke.remove(view, HOVER_ID);
+      }),
+    );
+
 
     if (!container) {
       this.paper = null;
@@ -192,11 +231,7 @@ export default class Graph {
       onViewPortChange: () => this.saveCurrentViewPort(),
     });
     this.publishPointerEvents();
-    this.answerCommands();
-    // Tapping selects, as Cytoscape does; tapping blank paper clears.
-    this.subscriptions.push(
-      this.eventbus.on('cell:tap').subscribe(({ cell }) => this.select(cell)),
-    );
+    this.applyMode();
     this.renderGrid(true);
   }
 
@@ -415,6 +450,10 @@ export default class Graph {
       this.renderGrid(true);
     }
     if (config.edges?.router !== undefined) this.useRouter(config.edges.router);
+    if (config.mode !== undefined) {
+      this.applyMode();
+      this.eventbus.emit('mode:changed', { mode: this.mode });
+    }
     if (this.isRendered) this.setPosition();
     this.restyle();
     return this;
@@ -659,6 +698,7 @@ export default class Graph {
       bus.on('config:set').subscribe((config) => this.setConfig(config)),
       bus.on('node:move').subscribe(({ id, position }) => this.setNodePosition(id, position)),
       bus.on('cells:remove').subscribe(({ selector }) => this.remove(selector)),
+      bus.on('mode:set').subscribe(({ mode }) => this.setConfig({ mode })),
       bus.on('selection:set').subscribe(({ id }) => {
         this.select(id === null ? null : (this.model.getCell(id) ?? null));
       }),
@@ -684,6 +724,18 @@ export default class Graph {
         this.fit();
       }),
     );
+  }
+
+  /**
+   * Turns the paper's editing affordances on or off.
+   *
+   * Dragging a node stays on in both: moving something for legibility is
+   * reading, not editing, and the grid snap means it cannot be put anywhere
+   * the layout would not have allowed anyway.
+   */
+  private applyMode(): void {
+    const editing = this.mode === 'edit';
+    this.paper?.setInteractivity({ linkMove: editing, vertexAdd: editing, labelMove: editing });
   }
 
   /** Draws or removes the selection ring. */

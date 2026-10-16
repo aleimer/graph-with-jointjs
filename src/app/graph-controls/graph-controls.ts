@@ -13,6 +13,7 @@ import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { isCollapsed } from '../joint/cell-state';
 import Graph from '../joint/graph';
 import { GroupNode } from '../joint/nodes';
+import type { GraphMode } from '../joint/types';
 
 /**
  * The toolbar.
@@ -46,6 +47,14 @@ export class GraphControls implements OnChanges {
   readonly edgesHidden = signal(false);
   readonly valuesVisible = signal(true);
 
+  /**
+   * Reading or editing. Everything that changes the graph is hidden while
+   * reading — a toolbar offering actions the mode does not allow is worse
+   * than one that offers fewer.
+   */
+  readonly mode = signal<GraphMode>('view');
+  readonly editing = computed(() => this.mode() === 'edit');
+
   readonly hasSelection = signal(false);
   readonly selectionIsGroup = signal(false);
   readonly selectionCollapsed = signal(false);
@@ -66,6 +75,10 @@ export class GraphControls implements OnChanges {
   }
 
   // --- what it asks for --------------------------------------------------------
+
+  toggleMode(): void {
+    this.graph().eventbus.emit('mode:set', { mode: this.editing() ? 'view' : 'edit' });
+  }
 
   addNode(): void {
     const graph = this.graph();
@@ -177,6 +190,11 @@ export class GraphControls implements OnChanges {
       .subscribe(({ viewPort }) => this.zoomPercent.set(Math.round(viewPort.zoom * 100)));
 
     bus
+      .on('mode:changed')
+      .pipe(takeUntilDestroyed(ref))
+      .subscribe(({ mode }) => this.mode.set(mode));
+
+    bus
       .on('selection:changed')
       .pipe(takeUntilDestroyed(ref))
       .subscribe(({ cell }) => {
@@ -191,6 +209,8 @@ export class GraphControls implements OnChanges {
     this.nodeCount.set(nodes.length);
     this.linkCount.set(edges.length);
     this.zoomPercent.set(Math.round(graph.viewPort.zoom * 100));
+
+    this.mode.set(graph.mode);
 
     const label = graph.config.edges?.weight?.label;
     this.weightLabel.set(label === false ? undefined : label);

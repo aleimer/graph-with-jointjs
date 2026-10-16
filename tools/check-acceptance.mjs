@@ -543,11 +543,28 @@ try {
   }
 
   // 5. Dynamic calculation: time a full re-route triggered by moving a node.
+  //
+  // A leaf, dragged. Clicking the first element on the page would land on a
+  // group, and in view mode a click on one opens or closes it — which is a
+  // far bigger operation than a nudge, and not what this is measuring. And a
+  // click that does not move anything re-routes nothing, so it would measure
+  // nothing at all.
+  const dragged = nodes.find((n) => !n.isGroup && n.width > 0);
+  if (!dragged) throw new Error('no leaf node to drag');
+
   const timing = await page.evaluate(`(() => {
+    const node = document.querySelector('[model-id="${dragged.id}"]');
+    if (!node) throw new Error('node not rendered');
+    const box = node.getBoundingClientRect();
+    const from = { clientX: box.left + box.width / 2, clientY: box.top + box.height / 2 };
+    const to = { clientX: from.clientX + 90, clientY: from.clientY + 60 };
+    const fire = (type, at, target) =>
+      target.dispatchEvent(new MouseEvent(type, { bubbles: true, cancelable: true, ...at }));
+
     const start = performance.now();
-    const node = document.querySelector('.joint-element');
-    node.dispatchEvent(new MouseEvent('mousedown', { bubbles: true, clientX: 100, clientY: 100 }));
-    node.dispatchEvent(new MouseEvent('mouseup', { bubbles: true, clientX: 100, clientY: 100 }));
+    fire('mousedown', from, node);
+    fire('mousemove', to, document);
+    fire('mouseup', to, document);
     return new Promise((resolve) =>
       requestAnimationFrame(() =>
         requestAnimationFrame(() => resolve(Math.round(performance.now() - start))),

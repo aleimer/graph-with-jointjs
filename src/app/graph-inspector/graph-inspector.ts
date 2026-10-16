@@ -35,11 +35,13 @@ export class GraphInspector implements OnChanges {
   readonly label = signal<string | null>(null);
   readonly json = signal('');
   readonly isGroup = signal(false);
+  /** False for an edge, which has no place on the grid to show. */
+  readonly isNode = signal(false);
   readonly col = signal(0);
   readonly row = signal(0);
 
   private readonly destroyRef = inject(DestroyRef);
-  private selected: dia.Element | null = null;
+  private selected: dia.Cell | null = null;
   private bound = false;
 
   ngOnChanges(): void {
@@ -54,9 +56,14 @@ export class GraphInspector implements OnChanges {
     this.selected?.attr('label/text', value);
   }
 
+  /** The selected cell, for the template's benefit. */
+  private element(): dia.Element | null {
+    return this.selected?.isElement() ? (this.selected as dia.Element) : null;
+  }
+
   /** Moves the selected node to a grid cell typed into the panel. */
   move(axis: 'col' | 'row', value: string): void {
-    const element = this.selected;
+    const element = this.element();
     if (!element) return;
 
     const parsed = Number.parseInt(value, 10);
@@ -77,9 +84,7 @@ export class GraphInspector implements OnChanges {
       .on('selection:changed')
       .pipe(takeUntilDestroyed(ref))
       .subscribe(({ cell }) => {
-        // Only elements for now: the panel's fields are a label and a grid
-        // cell, and a link has neither.
-        this.selected = cell?.isElement() ? (cell as dia.Element) : null;
+        this.selected = cell;
         this.show();
       });
 
@@ -89,14 +94,23 @@ export class GraphInspector implements OnChanges {
   }
 
   private show(): void {
-    const element = this.selected;
+    const cell = this.selected;
+    const element = this.element();
 
-    this.label.set(element ? String(element.attr('label/text') ?? '') : null);
-    this.isGroup.set(element instanceof GroupNode);
-    this.json.set(element ? JSON.stringify(dataOf(element), null, 2) : '');
+    // An edge's label lives on its own label list, not on a `label` attribute.
+    const text = !cell
+      ? null
+      : element
+        ? String(element.attr('label/text') ?? '')
+        : String(dataOf(cell)['label'] ?? cell.id);
 
-    const cell = element ? this.graph().toGrid(element.position()) : { col: 0, row: 0 };
-    this.col.set(cell.col);
-    this.row.set(cell.row);
+    this.label.set(text);
+    this.isNode.set(element !== null);
+    this.isGroup.set(cell instanceof GroupNode);
+    this.json.set(cell ? JSON.stringify(dataOf(cell), null, 2) : '');
+
+    const at = element ? this.graph().toGrid(element.position()) : { col: 0, row: 0 };
+    this.col.set(at.col);
+    this.row.set(at.row);
   }
 }

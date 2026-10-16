@@ -48,7 +48,6 @@ button {
 }
 
 .stats {
-  margin-left: auto;
   font-size: 12px;
   color: #64748b;
   font-variant-numeric: tabular-nums;
@@ -58,4 +57,19 @@ button.is-off {
   color: #94a3b8;
   background: #ffffff;
   border-style: dashed;
+}
+
+.mode {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-left: auto;
+  font-size: 12px;
+  color: #475569;
+  user-select: none;
+  cursor: pointer;
+}
+
+.mode input {
+  cursor: pointer;
 }

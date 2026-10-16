@@ -1,6 +1,6 @@
 import { dia } from '@joint/core';
 import { Observable, Subject, filter, map } from 'rxjs';
-import type { Config, EventObject, GridPosition, ViewPort } from './types';
+import type { Config, EventObject, GraphMode, GridPosition, ViewPort } from './types';
 
 /**
  * The events the graph carries, and what each one says.
@@ -43,6 +43,9 @@ export interface GraphEvents {
    */
   'selection:changed': { cell: dia.Cell | null };
 
+  /** The diagram switched between reading and editing. */
+  'mode:changed': { mode: GraphMode };
+
   // --- asked of the graph ----------------------------------------------------
   'viewport:zoom': { by?: number; to?: number };
   'viewport:fit': void;
@@ -56,6 +59,7 @@ export interface GraphEvents {
   'selection:set': { id: string | null };
   'selection:delete': void;
   'selection:collapse': void;
+  'mode:set': { mode: GraphMode };
 }
 
 /** A pointer event on a cell, or on blank paper when `cell` is null. */

@@ -95,12 +95,25 @@ export class Diagram implements AfterViewInit, OnDestroy {
     bus
       .on('cell:mouseover')
       .pipe(takeUntilDestroyed(ref))
-      .subscribe(({ view }) => this.addHoverTools(view));
+      .subscribe(({ view }) => {
+        // Only while editing. Reading, the graph highlights the edge under
+        // the pointer instead, and tools that could change it would be
+        // offering what the mode does not allow.
+        if (graph.mode === 'edit') this.addHoverTools(view);
+      });
 
     bus
       .on('cell:mouseout')
       .pipe(takeUntilDestroyed(ref))
       .subscribe(({ view }) => view?.removeTools());
+
+    // Leaving edit mode takes any tools still on screen with it.
+    bus
+      .on('mode:changed')
+      .pipe(takeUntilDestroyed(ref))
+      .subscribe(({ mode }) => {
+        if (mode === 'view') graph.paper?.removeTools();
+      });
   }
 
   /** The tools shown while the pointer is over a cell. */

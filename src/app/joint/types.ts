@@ -138,7 +138,18 @@ export interface EdgeWeightLabel {
   decimals?: number;
 }
 
+/**
+ * What the diagram is for right now.
+ *
+ * `view` is for reading it: nodes and edges can be inspected, groups opened
+ * and closed, nodes dragged for legibility — but nothing about the graph
+ * itself changes. `edit` adds the tools that do change it.
+ */
+export type GraphMode = 'view' | 'edit';
+
 export interface Config {
+  /** Defaults to `view`. */
+  mode?: GraphMode;
   /** Selector or predicate; anything that does NOT match is hidden. */
   filter?: string | ((cell: dia.Cell) => boolean);
   edges?: EdgeConfig;

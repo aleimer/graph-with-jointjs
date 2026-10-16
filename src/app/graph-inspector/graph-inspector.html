@@ -2,25 +2,34 @@
   <aside class="inspector">
     <label class="field">
       <span>Label</span>
-      <input type="text" [value]="label()" (input)="rename($any($event.target).value)" />
+      <input
+        type="text"
+        [value]="label()"
+        [readOnly]="!isNode()"
+        (input)="rename($any($event.target).value)"
+      />
     </label>
 
-    <div class="grid-field">
-      <label class="field">
-        <span>Column</span>
-        <input type="number" [value]="col()" (input)="move('col', $any($event.target).value)" />
-      </label>
-      <label class="field">
-        <span>Row</span>
-        <input type="number" [value]="row()" (input)="move('row', $any($event.target).value)" />
-      </label>
-    </div>
+    @if (isNode()) {
+      <div class="grid-field">
+        <label class="field">
+          <span>Column</span>
+          <input type="number" [value]="col()" (input)="move('col', $any($event.target).value)" />
+        </label>
+        <label class="field">
+          <span>Row</span>
+          <input type="number" [value]="row()" (input)="move('row', $any($event.target).value)" />
+        </label>
+      </div>
+    }
 
     <p class="hint">
       @if (isGroup()) {
         Group node — collapsing stashes its children and re-points crossing edges at the group.
-      } @else {
+      } @else if (isNode()) {
         Element <code>data</code>, as passed to <code>addElements()</code>:
+      } @else {
+        Edge <code>data</code>, as passed to <code>addElements()</code>:
       }
     </p>
     <pre>{{ json() }}</pre>

@@ -527,6 +527,77 @@ describe('Graph facade', () => {
     expect(completed).toBe(true);
   });
 
+  it('opens and closes a group when it is tapped in view mode', () => {
+    graph.render();
+    const tap = (cell: dia.Cell) =>
+      graph.eventbus.emit('cell:tap', {
+        type: 'tap',
+        cell,
+        view: null,
+        paper: null as unknown as dia.Paper,
+        originalEvent: null,
+        position: { x: 0, y: 0 },
+      });
+
+    expect(graph.mode).toBe('view');
+    expect(pipeline().getEmbeddedCells().length).toBe(2);
+
+    tap(pipeline());
+    expect(pipeline().get('collapsed')).toBe(true);
+    expect(graph.model.getCell('transform')).toBeUndefined();
+    // Opening a group is the whole meaning of the click; it is not also
+    // selected, or the panels would offer actions the mode does not allow.
+    expect(graph.selected).toBeNull();
+
+    tap(pipeline());
+    expect(pipeline().get('collapsed')).toBe(false);
+    expect(graph.model.getCell('transform')).toBeDefined();
+  });
+
+  it('selects a group when it is tapped in edit mode', () => {
+    graph.setConfig({ mode: 'edit' }).render();
+
+    graph.eventbus.emit('cell:tap', {
+      type: 'tap',
+      cell: pipeline(),
+      view: null,
+      paper: null as unknown as dia.Paper,
+      originalEvent: null,
+      position: { x: 0, y: 0 },
+    });
+
+    expect(graph.selected).toBe(pipeline());
+    expect(pipeline().get('collapsed')).toBeFalsy();
+  });
+
+  it('selects an edge so its details can be shown', () => {
+    graph.render();
+    const link = linkById('e1');
+
+    graph.eventbus.emit('cell:tap', {
+      type: 'tap',
+      cell: link,
+      view: null,
+      paper: null as unknown as dia.Paper,
+      originalEvent: null,
+      position: { x: 0, y: 0 },
+    });
+
+    expect(graph.selected).toBe(link);
+  });
+
+  it('announces a mode change so every panel hears it', () => {
+    const seen: string[] = [];
+    graph.eventbus.on('mode:changed').subscribe(({ mode }) => seen.push(mode));
+
+    graph.eventbus.emit('mode:set', { mode: 'edit' });
+    expect(graph.mode).toBe('edit');
+
+    graph.setConfig({ mode: 'view' });
+    expect(graph.mode).toBe('view');
+    expect(seen).toEqual(['edit', 'view']);
+  });
+
   it('round-trips the viewport', () => {
     graph.setViewPort({ pan: { x: 40, y: -20 }, zoom: 1.5 });
     graph.saveCurrentViewPort();
