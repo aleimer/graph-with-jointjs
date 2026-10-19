@@ -27,24 +27,18 @@ say it cannot.
 A drag of zero distance passes every check, so this is about the node being
 somewhere new, not about re-routing as such.
 
-### 1.2 Links far from a drag collapse onto one centreline
-
-Same command:
-
-```
-FAIL  Overlap   14 pairs at "apart": 0, 1083-1709px side by side, around x=10200
-```
-
-Nothing was dragged near x=10200. `gutters()` is global, so moving any node
-changes which gaps qualify as corridors everywhere; some links then settle on
-identical centrelines. The corridor allocator is not seeing them as a conflict.
-
-### 1.3 Elbow routes do not reserve a corridor
+### 1.2 Elbow routes do not reserve a corridor
 
 `placeRuns` reserves a channel for every dog-leg and every centred fallback
 run, and consults those reservations before placing the next. A one-bend elbow
 reserves nothing and consults nothing, so a dog-leg can be placed straight
-along an elbow's leg. Suspected to be behind 1.2.
+along an elbow's leg.
+
+Once suspected of putting links far from a drag onto one centreline (14 pairs
+around x=10200, after a drag or a collapse and expand). That turned out to be
+the paper drawing stale routes: the model had them a lane apart all along.
+`placeRuns` moved points the model shared, so the final set changed nothing
+and fired no event. Fixed by giving the model its own copy.
 
 ---
 

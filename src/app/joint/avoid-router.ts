@@ -490,8 +490,17 @@ export class AvoidRouter {
 
         const corner = ([side]: [Side, Side]) =>
           HORIZONTAL[side] ? { x: to.x, y: from.y } : { x: from.x, y: to.y };
+        // Both legs have to reach past their own node. Two nodes almost in a
+        // row put the corner inside the target — `isClear` ignores the ends —
+        // and the link then hooks through it to a dock on its far side.
+        const legsClear = ([side]: [Side, Side]) =>
+          HORIZONTAL[side]
+            ? Math.abs(dx) - sourceBox.width / 2 >= MIN_BEND &&
+              Math.abs(dy) - targetBox.height / 2 >= MIN_BEND
+            : Math.abs(dy) - sourceBox.height / 2 >= MIN_BEND &&
+              Math.abs(dx) - targetBox.width / 2 >= MIN_BEND;
         const viable = (variant: [Side, Side]) =>
-          this.isClear([from, corner(variant), to], endIds);
+          legsClear(variant) && this.isClear([from, corner(variant), to], endIds);
 
         if (viable(first)) {
           [sourceSide, targetSide] = first;
@@ -1373,8 +1382,25 @@ export class AvoidRouter {
 
   // --- routing -------------------------------------------------------------
 
+  /**
+   * One pass, as one batch.
+   *
+   * `jumpover` draws a link's hops against the links already drawn, and only
+   * revisits them when a batch ends. Without one, a link that another is
+   * routed across later in the same pass keeps the hops it had before, and
+   * the crossing is left unmarked.
+   */
   private process(rerouting = false): void {
     if (this.destroyed || !this.connectors.size) return;
+    this.graph.startBatch('avoid-router');
+    try {
+      this.pass(rerouting);
+    } finally {
+      this.graph.stopBatch('avoid-router');
+    }
+  }
+
+  private pass(rerouting: boolean): void {
     this.passCount++;
 
     // A run is every pass up to the point nothing more is queued: one drop
@@ -1888,6 +1914,19 @@ export class AvoidRouter {
     return false;
   }
 
+  /**
+   * Vertices for the model that share no points with the router's own.
+   *
+   * `placeRuns` moves runs by editing their points in place. Points the model
+   * also holds move with them, unannounced, so the final set finds nothing
+   * changed, fires no event, and the paper goes on drawing the route from
+   * before the move — two links drawn on one centreline that the model says
+   * are a lane apart.
+   */
+  private static copy(points: dia.Point[]): dia.Point[] {
+    return points.map(({ x, y }) => ({ x, y }));
+  }
+
   private applyRoute(link: dia.Link, connector: AvoidConn): void {
     const route = connector.displayRoute();
     const points: dia.Point[] = [];
@@ -1926,7 +1965,7 @@ export class AvoidRouter {
       );
       if (detour) {
         link.set('router', { name: 'normal' }, options);
-        link.set('vertices', detour, options);
+        link.set('vertices', AvoidRouter.copy(detour), options);
         this.centred.push({ link, vertices: detour, options });
         return;
       }
@@ -1969,7 +2008,7 @@ export class AvoidRouter {
     // the polyline libavoid computed. `avoidRouter: true` keeps the resulting
     // change event from re-entering the router.
     link.set('router', { name: 'normal' }, options);
-    link.set('vertices', vertices, options);
+    link.set('vertices', AvoidRouter.copy(vertices), options);
     // The runs in these vertices may still move when every route is known, so
     // the link is noted for a second, final set.
     this.centred.push({ link, vertices, options });
