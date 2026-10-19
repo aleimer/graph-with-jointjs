@@ -1,7 +1,8 @@
-import { dia } from '@joint/core';
-import { MAJOR_GRID, NODE_GAP } from './constants';
+import { dia, g } from '@joint/core';
+import { isCollapsed } from './cell-state';
+import { GROUP_PADDING, MAJOR_GRID, NODE_GAP } from './constants';
 import { FlowLink } from './edges';
-import { GroupNode, TaskNode, cellNamespace } from './nodes';
+import { BaseNode, GroupNode, cellNamespace } from './nodes';
 
 /** The paper's own background, and the colour the grid is drawn onto. */
 export const PAPER_BACKGROUND = '#f8fafc';
@@ -43,9 +44,15 @@ export function createPaper(
     frontParentOnly: false,
     findParentBy: 'bbox',
 
-    // Only a task goes into a group, and only a group takes one.
+    // Any node goes into a group, but not another group, and only a group
+    // takes one. A drag lifts a child out and drops it back only if this
+    // says yes, so leaving a kind out is how it loses its group.
     validateEmbedding: (childView, parentView) =>
-      parentView.model instanceof GroupNode && childView.model instanceof TaskNode,
+      parentView.model instanceof GroupNode && childView.model instanceof BaseNode,
+
+    // Once in a group, a node stays in it: a drag stops at the group's inner
+    // edge rather than carrying it out.
+    restrictTranslate: (elementView) => childArea(elementView.model) ?? false,
 
     defaultLink: () => new FlowLink(),
 
@@ -73,6 +80,24 @@ export function createPaper(
       },
     },
   });
+}
+
+/**
+ * Where `element` may sit inside its group: the group's box less the padding
+ * it is fitted with, so a child held there never makes it grow. Null for a
+ * node outside a group, which may go anywhere.
+ */
+export function childArea(element: dia.Element): g.Rect | null {
+  const parent = element.getParentCell();
+  if (!(parent instanceof GroupNode) || isCollapsed(parent)) return null;
+  const { top, left, right, bottom } = GROUP_PADDING;
+  const box = parent.getBBox();
+  return new g.Rect(
+    box.x + left,
+    box.y + top,
+    box.width - left - right,
+    box.height - top - bottom,
+  );
 }
 
 /**

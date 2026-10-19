@@ -2,6 +2,7 @@ import { dia, mvc } from '@joint/core';
 import { isCollapsed } from './cell-state';
 import { GROUP_PADDING, ZOOM_MAX, ZOOM_MIN, ZOOM_STEP } from './constants';
 import { GroupNode } from './nodes';
+import { childArea } from './paper';
 import type { GridPosition, Position, PositionInput } from './types';
 
 /**
@@ -89,6 +90,61 @@ export function installInteraction(paper: dia.Paper, hooks: InteractionHooks): (
       onWheel(evt, x, y, delta),
   );
 
+  // --- a drag leaves a faded copy where the node started -------------------
+  // Only a picture: a clone of what is drawn, with nothing behind it in the
+  // model, so the node itself is still what JointJS drags and drops. Its
+  // links stay behind with the copy, routed as they were, and the real ones
+  // are hidden until the drop: a link stretching after the pointer is drawn
+  // straight and rerouted on release, which is a jump worth not showing.
+  let ghosts: Element[] = [];
+  let hidden: SVGElement[] = [];
+  const clearGhosts = () => {
+    for (const ghost of ghosts) ghost.remove();
+    for (const el of hidden) el.style.visibility = '';
+    ghosts = [];
+    hidden = [];
+  };
+
+  // Copies go straight under what is dragged, in the order they are made, so
+  // it always passes over them — a group's backdrop included — while a
+  // child's copies stay above the group it sits in.
+  let behind: Element | null = null;
+  const leaveGhost = (cell: dia.Cell, opacity: number) => {
+    const original = cell.findView(paper)?.el;
+    const layer = original?.parentNode;
+    if (!original || !layer) return null;
+    const ghost = original.cloneNode(true) as Element;
+    // Nameless, so nothing that looks a cell up by id or class finds it.
+    ghost.removeAttribute('model-id');
+    ghost.removeAttribute('id');
+    ghost.setAttribute('class', 'drag-ghost');
+    ghost.setAttribute('opacity', String(opacity));
+    ghost.setAttribute('pointer-events', 'none');
+    layer.insertBefore(ghost, behind?.parentNode === layer ? behind : original);
+    ghosts.push(ghost);
+    return original;
+  };
+
+  // Registered ahead of the routing hold below, which straightens these
+  // links: the copies have to be taken while they still have their routes.
+  on('element:pointerdown', (view: dia.ElementView) => {
+    clearGhosts();
+    behind = view.el;
+    const children = view.model.getEmbeddedCells({ deep: true }).filter((c) => c.isElement());
+    // A group is drawn apart from its children and the links between them,
+    // so they are copied too: backdrop, then links, then nodes on top.
+    const links = paper.model.getConnectedLinks(view.model, { deep: true, includeEnclosed: true });
+    leaveGhost(view.model, 0.35);
+    for (const link of links) {
+      const original = leaveGhost(link, 1);
+      if (!original) continue;
+      original.style.visibility = 'hidden';
+      hidden.push(original);
+    }
+    for (const child of children) leaveGhost(child, 0.35);
+  });
+  on('element:pointerup', clearGhosts);
+
   // --- a drag holds routing until it is over --------------------------------
   on('element:pointerdown', (view: dia.ElementView) => hooks.onDragStart(view.model));
 
@@ -98,7 +154,17 @@ export function installInteraction(paper: dia.Paper, hooks: InteractionHooks): (
     // A group is sized and placed by its children, so snapping it would fight
     // the fit that follows.
     if (!(element instanceof GroupNode)) {
-      const { x, y } = hooks.toPixels(hooks.toGrid(element.position()));
+      let { x, y } = hooks.toPixels(hooks.toGrid(element.position()));
+      // The nearest cell can be over a group's edge; take the one inside.
+      const area = childArea(element);
+      if (area) {
+        const step = paper.options.gridSize ?? 1;
+        const { width, height } = element.size();
+        if (x < area.x) x += step;
+        else if (x + width > area.x + area.width) x -= step;
+        if (y < area.y) y += step;
+        else if (y + height > area.y + area.height) y -= step;
+      }
       element.position(x, y);
     }
 
@@ -113,6 +179,7 @@ export function installInteraction(paper: dia.Paper, hooks: InteractionHooks): (
   });
 
   return () => {
+    clearGhosts();
     for (const [event, handler] of bound) paper.off(event, handler);
     bound.length = 0;
   };
